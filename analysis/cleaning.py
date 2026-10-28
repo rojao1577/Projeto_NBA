@@ -47,3 +47,10 @@ def fix_percentages(df: pd.DataFrame) -> pd.DataFrame:
     for col in PERCENT_COLUMNS:
         df[col] = df[col].where(df[col] <= 1, df[col] / 1000)
     return df
+
+
+def clean(df: pd.DataFrame) -> pd.DataFrame:
+    df = convert_dates(df)
+    df = rename_columns(df)
+    df = derive_matchups(df)
+    return fix_percentages(df)

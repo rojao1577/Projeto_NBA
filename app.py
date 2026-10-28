@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template
 
 
 def create_app() -> Flask:
@@ -6,7 +6,11 @@ def create_app() -> Flask:
 
     @app.route("/")
     def index():
-        return "Olá! Projeto 1 — Laboratório de Ciência de Dados (NBA 2025-26)."
+        return render_template("em_construcao.html", title="Início")
+
+    @app.route("/cv")
+    def cv():
+        return render_template("em_construcao.html", title="Coeficiente de variação")
 
     return app
 

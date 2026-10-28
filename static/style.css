@@ -1,0 +1,236 @@
+/* ---------- cores (modo claro e escuro) ---------- */
+:root {
+  color-scheme: light;
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --text: #1c1c1a;
+  --muted: #5f5e5a;
+  --border: #e2e1dc;
+  --stripe: #f9f9f7;
+  --accent: #2a78d6;
+  --cle: #2a78d6;
+  --nyk: #eb6834;
+  --notice-bg: #fff6e0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141413;
+    --surface: #1d1d1c;
+    --text: #efeeea;
+    --muted: #b3b2ab;
+    --border: #34332f;
+    --stripe: #232321;
+    --accent: #5b9bea;
+    --cle: #3987e5;
+    --nyk: #d95926;
+    --notice-bg: #3a2f14;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141413;
+  --surface: #1d1d1c;
+  --text: #efeeea;
+  --muted: #b3b2ab;
+  --border: #34332f;
+  --stripe: #232321;
+  --accent: #5b9bea;
+  --cle: #3987e5;
+  --nyk: #d95926;
+  --notice-bg: #3a2f14;
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 16px 48px;
+}
+
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.3rem; margin: 0 0 12px; }
+h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+p { margin: 0 0 12px; }
+a { color: var(--accent); }
+
+.lead { color: var(--muted); font-size: 1.05rem; max-width: 70ch; margin-bottom: 24px; }
+
+/* ---------- cabeçalho e menu ---------- */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+}
+
+.brand {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+
+nav { min-width: 0; flex: 1; }
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;      /* no celular, o menu rola de lado sem esticar a página */
+}
+nav a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  font-size: 0.92rem;
+}
+nav a:hover { background: var(--stripe); color: var(--text); }
+nav a[aria-current="page"] { background: var(--accent); color: #fff; }
+
+/* ---------- cartões: (a) resultados e (b) interpretação ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card.interpretation { border-left: 4px solid var(--accent); }
+.card-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.notice {
+  background: var(--notice-bg);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+/* ---------- formulário de filtros ---------- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+}
+.filters label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--muted); gap: 4px; }
+.filters select,
+.filters button {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  min-width: 200px;
+}
+.filters button {
+  min-width: 0;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- tabelas ---------- */
+.table-wrap { overflow-x: auto; }   /* tabela larga rola dentro do cartão */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+th, td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+thead th {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+tbody tr:nth-child(even) { background: var(--stripe); }
+
+/* números: alinhados à direita e com dígitos de mesma largura */
+td.num, th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------- gráficos ---------- */
+.chart {
+  background: #ffffff;   /* o Plotly desenha em fundo claro; mantém o gráfico legível no modo escuro */
+  border-radius: 8px;
+  padding: 8px;
+  overflow-x: auto;
+}
+
+/* ---------- marcadores dos times do grupo ---------- */
+.team-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+.team-dot.cle { background: var(--cle); }
+.team-dot.nyk { background: var(--nyk); }
+
+/* ---------- rodapé ---------- */
+.site-footer {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+  h1 { font-size: 1.5rem; }
+  .card { padding: 16px; }
+  .filters select { min-width: 0; width: 100%; }
+  .filters label { flex: 1 1 100%; }
+}

@@ -32,3 +32,7 @@ def team_table(df: pd.DataFrame, team: str, columns: list[str]) -> pd.DataFrame:
 def outlier_games(df: pd.DataFrame, team: str, col: str) -> pd.DataFrame:
     team_games = df[df["time"] == team]
     return team_games[iqr_outliers(team_games[col])][["data_jogo", "confronto", "minutos", col]]
+
+
+def compare_teams(df: pd.DataFrame, teams: list[str], col: str) -> pd.DataFrame:
+    return pd.DataFrame({team: describe(df[df["time"] == team][col]) for team in teams})

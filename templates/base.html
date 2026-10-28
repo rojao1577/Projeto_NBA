@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Relatório{% endblock %} · NBA 2025-26</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  {% set sections = [
+    ("/", "Início"),
+    ("/dados", "Dados"),
+    ("/tratamento", "Tratamento"),
+    ("/qualidade", "Qualidade"),
+    ("/outliers", "Outliers"),
+    ("/descritiva", "Descritiva"),
+    ("/assimetria", "Assimetria"),
+    ("/cv", "CV"),
+    ("/iqr", "IQR"),
+    ("/sintese", "Síntese"),
+  ] %}
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/">NBA 2025-26 <span>Relatório de análise de dados</span></a>
+      <nav aria-label="Seções do relatório">
+        <ul>
+          {% for path, label in sections %}
+          <li><a href="{{ path }}" {% if request.path == path %}aria-current="page"{% endif %}>{{ label }}</a></li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    Projeto 1 · Laboratório de Ciência de Dados · UFAPE 2026.2 · Prof. Ryan Azevedo
+  </footer>
+</body>
+</html>

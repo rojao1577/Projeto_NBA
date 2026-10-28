@@ -1,5 +1,6 @@
 import plotly.graph_objects as go
 from analysis.descriptive import describe
+from analysis.formatting import number
 
 VARIABLE_NAMES = {
     "pontos": "Pontos",
@@ -21,10 +22,6 @@ def _transparent(hex_color: str, alpha: float = 0.3) -> str:
     return f"rgba({r}, {g}, {b}, {alpha})"
 
 
-def _num(value: float) -> str:
-    return f"{value:.2f}".replace(".", ",")
-
-
 def _first_time(fig: go.Figure, name: str) -> bool:
     return name not in {trace.name for trace in fig.data}
 
@@ -34,7 +31,7 @@ def _add_line(fig, x, y, name, dash, width):
     fig.add_trace(go.Scatter(
         x=[x - half, x + half], y=[y, y], mode="lines", name=name, legendgroup=name,
         showlegend=_first_time(fig, name), line=dict(color=INK, dash=dash, width=width),
-        hovertext=f"{name}: {_num(y)}", hoverinfo="text",
+        hovertext=f"{name}: {number(y)}", hoverinfo="text",
     ))
 
 
@@ -64,16 +61,16 @@ def boxplot(df, teams, col):
             line=dict(color=color, width=2), name="Caixa: de Q1 a Q3",
             legendgroup="caixa", showlegend=x == 0, hoverinfo="skip",
         ))
-        fig.add_annotation(x=x + BOX_WIDTH / 2, y=stats["q3"], text=f"Q3 = {_num(stats['q3'])}",
+        fig.add_annotation(x=x + BOX_WIDTH / 2, y=stats["q3"], text=f"Q3 = {number(stats['q3'])}",
                            xanchor="left", showarrow=False, font=dict(size=11, color=INK))
-        fig.add_annotation(x=x + BOX_WIDTH / 2, y=stats["q1"], text=f"Q1 = {_num(stats['q1'])}",
+        fig.add_annotation(x=x + BOX_WIDTH / 2, y=stats["q1"], text=f"Q1 = {number(stats['q1'])}",
                            xanchor="left", showarrow=False, font=dict(size=11, color=INK))
 
         _add_line(fig, x, high, "Limite superior (Q3 + 1,5 × IQR)", "dash", 1.5)
         _add_line(fig, x, stats["mediana"], "Mediana", "solid", 3)
         _add_line(fig, x, low, "Limite inferior (Q1 − 1,5 × IQR)", "dot", 1.5)
         _add_points(fig, x, [stats["media"]], "Média", "diamond", 11, "#0b0b0b",
-                    [f"Média: {_num(stats['media'])}"])
+                    [f"Média: {number(stats['media'])}"])
         _add_points(fig, x, stats["moda"], "Moda", "star", 14, "#eda100",
                     [f"Moda: {m}" for m in stats["moda"]])
 
