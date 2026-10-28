@@ -1,7 +1,5 @@
 import pandas as pd
-
 from config import RAW_CSV
-
 from functools import lru_cache
 
 

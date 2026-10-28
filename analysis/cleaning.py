@@ -1,5 +1,4 @@
 import pandas as pd
-
 from analysis.dictionary import RENAME_MAP
 
 PERCENT_COLUMNS = [
