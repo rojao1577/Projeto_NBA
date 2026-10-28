@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Estatística descritiva{% endblock %}
+
+{% block content %}
+<h1>Estatística descritiva</h1>
+<p class="lead">
+  Medidas de cada variável, por time, com o boxplot correspondente. Escolha dois times e uma variável
+  para comparar. Os times principais do projeto (<span class="nowrap">Cleveland Cavaliers</span> e
+  <span class="nowrap">New York Knicks</span>) já vêm selecionados.
+</p>
+
+<section class="card">
+  <form class="filters" method="get" action="/descritiva">
+    <label>Time A
+      <select name="time_a">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_a %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Time B
+      <select name="time_b">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_b %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Variável
+      <select name="variavel">
+        {% for col, name in variable_names.items() %}
+        <option value="{{ col }}" {% if col == variable %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Ver</button>
+  </form>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Medidas — {{ variable_names[variable] }} por jogo</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Medida</th>
+          {% for team in table.columns %}
+          <th class="num"><span class="team-dot" style="background: {{ team_colors.get(team, other_color) }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for measure, row in table.iterrows() %}
+        <tr>
+          <td>{{ measure }}</td>
+          {% for value in row %}
+          <td class="num">{{ value }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Desvio padrão e variância amostrais (n − 1). Quartis por interpolação linear (padrão do pandas).
+    Limites = Q1 − 1,5 × IQR e Q3 + 1,5 × IQR. Valores com 2 casas decimais; jogos e outliers são contagens.
+  </p>
+
+  <h3>Boxplot</h3>
+  <div class="chart">{{ chart | safe }}</div>
+
+  <h3>Jogos outliers (IQR)</h3>
+  {% for team, games in outliers.items() %}
+    <h4><span class="team-dot" style="background: {{ team_colors.get(team, other_color) }}"></span>{{ team }}</h4>
+    {% if games %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Confronto</th><th class="num">Minutos</th><th class="num">{{ variable_names[variable] }}</th></tr>
+        </thead>
+        <tbody>
+          {% for game in games %}
+          <tr>
+            <td>{{ game.data_jogo.strftime("%d/%m/%Y") }}</td>
+            <td>{{ game.confronto }}</td>
+            <td class="num">{{ game.minutos }}</td>
+            <td class="num">{{ game[variable] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">
+      Nenhum jogo fora dos limites em {{ variable_names[variable] }}.
+      {% if elsewhere[team] %}
+      Este time tem outliers em: {{ elsewhere[team] | join(", ") }}.
+      {% else %}
+      Este time não tem outliers (IQR) em nenhuma das 7 variáveis.
+      {% endif %}
+    </p>
+    {% endif %}
+  {% endfor %}
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <p class="muted">Texto crítico sobre o Cleveland Cavaliers e o New York Knicks: em construção.</p>
+</section>
+{% endblock %}

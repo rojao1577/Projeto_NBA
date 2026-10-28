@@ -63,11 +63,15 @@ main {
 
 h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
 h2 { font-size: 1.3rem; margin: 0 0 12px; }
-h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+h3 { font-size: 1.05rem; margin: 28px 0 10px; }
+h4 { font-size: 0.95rem; margin: 16px 0 6px; }
 p { margin: 0 0 12px; }
 a { color: var(--accent); }
 
-.lead { color: var(--muted); font-size: 1.05rem; max-width: 70ch; margin-bottom: 24px; }
+.lead { color: var(--muted); font-size: 1.05rem; max-width: 95ch; margin-bottom: 24px; }
+.nowrap { white-space: nowrap; }
+.muted { color: var(--muted); }
+.table-note { color: var(--muted); font-size: 0.82rem; margin-top: 10px; }
 
 /* ---------- cabeçalho e menu ---------- */
 .site-header {
@@ -206,7 +210,7 @@ td.num, th.num {
   overflow-x: auto;
 }
 
-/* ---------- marcadores dos times do grupo ---------- */
+/* ---------- marcadores dos times principais ---------- */
 .team-dot {
   display: inline-block;
   width: 10px;
