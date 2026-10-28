@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Qualidade dos dados{% endblock %}
+
+{% block content %}
+<h1>Qualidade dos dados</h1>
+<p class="lead">
+  Antes de analisar, verificamos se a base é confiável: valores especiais, duplicados, valores fora de domínio,
+  ausentes e inconsistências entre colunas. Os outliers (valores raros, mas possíveis) têm uma seção própria.
+</p>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>1. Valores especiais: zeros e negativos</h2>
+  <p>
+    Das {{ numeric_columns }} colunas numéricas, <strong>nenhuma tem valores negativos</strong> e só
+    {{ zeros | length }} têm zeros. Todos os zeros têm um significado válido:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna</th><th class="num">Zeros</th><th class="num">Negativos</th><th>O que o zero significa</th></tr></thead>
+      <tbody>
+        {% for col, row in zeros.iterrows() %}
+        <tr>
+          <td><code>{{ col }}</code></td>
+          <td class="num">{{ row.zeros }}</td>
+          <td class="num">{{ row.negativos }}</td>
+          <td>{{ zero_meaning.get(col, "") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>2. Duplicados</h2>
+  <div class="stats">
+    <div class="stat"><span class="stat-value">{{ dups.linhas_identicas }}</span><span class="stat-label">linhas idênticas</span></div>
+    <div class="stat"><span class="stat-value">{{ dups.time_jogo_repetido }}</span><span class="stat-label">time + jogo repetidos</span></div>
+  </div>
+  <p>
+    O duplicado real seria o mesmo time aparecer duas vezes no mesmo jogo (<code>id_time</code> + <code>id_jogo</code>).
+    Já o <code>id_jogo</code> sozinho aparece <strong>exatamente 2 vezes</strong> de propósito: cada jogo tem uma linha
+    para cada time ({{ games }} jogos × 2 = {{ rows }} linhas).
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>3. Valores fora de domínio e a correção dos percentuais</h2>
+  <p>
+    Os aproveitamentos (convertidos ÷ tentados) só podem estar entre 0 e 1. No CSV original, porém, muitos vieram
+    sem o “0,” do começo: <strong>554 em vez de 0,554</strong>. Contagem de valores fora do domínio, antes e depois
+    da correção:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna</th><th>Domínio válido</th><th class="num">Antes</th><th class="num">Depois</th></tr></thead>
+      <tbody>
+        {% for col, row in domain.iterrows() %}
+        <tr>
+          <td><code>{{ col }}</code></td>
+          <td>{{ row.dominio }}</td>
+          <td class="num">{{ row.antes }}</td>
+          <td class="num">{{ row.depois }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p>
+    <strong>Critério da correção:</strong> todo valor maior que 1 foi dividido por 1000 (554 → 0,554).
+    <strong>Validação:</strong> recalculamos cada aproveitamento a partir das colunas de origem
+    (por exemplo, arremessos convertidos ÷ tentados) e contamos as diferenças maiores que 0,001:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna</th><th>Recalculado como</th><th class="num">Divergências antes</th><th class="num">Depois</th></tr></thead>
+      <tbody>
+        {% for col, row in validation.iterrows() %}
+        <tr>
+          <td><code>{{ col }}</code></td>
+          <td>{{ row.formula }}</td>
+          <td class="num">{{ row.antes }}</td>
+          <td class="num">{{ row.depois }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>4. Valores ausentes</h2>
+  <div class="stats">
+    <div class="stat"><span class="stat-value">{{ missing_total }}</span><span class="stat-label">células vazias, em {{ missing | length }} colunas</span></div>
+  </div>
+  <details>
+    <summary>Ver a contagem coluna por coluna</summary>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Coluna</th><th class="num">Ausentes</th></tr></thead>
+        <tbody>
+          {% for col, n in missing.items() %}
+          <tr><td><code>{{ col }}</code></td><td class="num">{{ n }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <h3>Zero não é ausente</h3>
+  <p>
+    Um valor <strong>ausente</strong> é uma célula vazia: não sabemos o valor. Um <strong>zero</strong> é um valor
+    conhecido: um jogo com 0 tocos teve, de fato, nenhum toco. É a diferença entre o aluno que tirou zero na prova
+    (tem nota) e o que faltou (não tem nota).
+  </p>
+  <p>
+    Alguns sistemas, porém, escrevem 0 quando não têm o dado, criando <strong>ausentes disfarçados de zero</strong>.
+    Verificamos que isso não acontece aqui: não há zeros em colunas onde o zero seria impossível (o mínimo de pontos
+    é 66, o de arremessos tentados é 67 e o de lances livres tentados é 2), e os 33 jogos com 0 tocos seguem a
+    distribuição natural da variável (33 jogos com 0 tocos, 107 com 1, 233 com 2, 332 com 3), sem um “pico” anormal
+    no zero. A base não tem ausentes visíveis nem disfarçados.
+  </p>
+
+  <h3>Mecanismos de ausência: MCAR, MAR e MNAR</h3>
+  <p>
+    Quando uma base tem ausentes, a primeira pergunta é <em>por que</em> eles faltam, porque isso decide como tratá-los.
+    Os três mecanismos clássicos são:
+  </p>
+  <ul>
+    <li>
+      <strong>MCAR (<em>Missing Completely At Random</em>, ausência completamente aleatória):</strong> a falta não tem
+      relação com nada, nem com outras colunas nem com o próprio valor. Exemplo: uma falha na exportação da planilha
+      apaga células ao acaso. É o caso menos grave: os dados restantes continuam representativos, e descartar as
+      linhas incompletas só diminui a amostra, sem distorcer os resultados.
+    </li>
+    <li>
+      <strong>MAR (<em>Missing At Random</em>, ausência aleatória condicionada ao que se observa):</strong> a falta
+      depende de <em>outras colunas observadas</em>, mas não do próprio valor. Exemplo na nossa base: o aproveitamento
+      de lances livres (convertidos ÷ tentados) ficaria vazio exatamente nos jogos com 0 lances livres tentados, porque
+      0 ÷ 0 não existe. Olhando outra coluna, dá para prever onde falta. Descartar linhas pode distorcer, mas métodos
+      que usam as outras colunas (como a imputação) conseguem corrigir.
+    </li>
+    <li>
+      <strong>MNAR (<em>Missing Not At Random</em>, ausência não aleatória):</strong> a falta depende do
+      <em>próprio valor que sumiu</em>. Exemplo hipotético: se o registro de roubos de bola falhasse justamente nos
+      jogos com poucos roubos, a média observada ficaria inflada. É o caso mais grave, e os dados sozinhos não revelam
+      o problema, porque o motivo da falta está no valor que não vemos.
+    </li>
+  </ul>
+
+  <h3>Testes: como e por que usar</h3>
+  <p>
+    Os quatro testes pedidos partem da mesma pergunta: <strong>os ausentes são MCAR?</strong> A hipótese nula é
+    “sim, MCAR”; rejeitá-la indica MAR ou MNAR. Nenhum teste consegue confirmar MNAR, justamente porque ele depende de
+    valores que não foram observados.
+  </p>
+  <ul>
+    <li>
+      <strong>Teste de Little (1988):</strong> agrupa as linhas pelo <em>padrão de ausência</em> (quais colunas faltam
+      em cada linha) e verifica, com uma estatística qui-quadrado, se as <em>médias</em> das colunas observadas são
+      iguais entre esses grupos. Médias diferentes indicam que quem tem ausentes é diferente de quem não tem, ou seja,
+      a falta não é aleatória. É o teste mais usado, mas supõe dados com distribuição aproximadamente normal.
+    </li>
+    <li>
+      <strong>Teste de Jamshidian e Jalal (2010):</strong> segue a mesma lógica, mas compara as
+      <em>variâncias e covariâncias</em> entre os padrões de ausência, e tem uma versão não paramétrica, que funciona
+      mesmo quando os dados não são normais. Por isso complementa o teste de Little.
+    </li>
+    <li>
+      <strong>Teste de Listing e Schlittgen (LS):</strong> pensado para dados observados ao longo do tempo, em que
+      participantes abandonam o acompanhamento. Compara, sem supor normalidade, os valores de quem saiu com os de quem
+      continuou. Na nossa base, o paralelo seria a sequência de jogos de cada time na temporada.
+    </li>
+    <li>
+      <strong>Regressão logística de Fairclough:</strong> cria uma variável indicadora “o valor faltou?” (1 = sim,
+      0 = não) e usa regressão logística para verificar se outras colunas <em>preveem</em> essa falta. Se alguma prever,
+      a ausência não é MCAR. Tem uma vantagem prática: mostra <em>quais</em> variáveis estão ligadas à falta.
+    </li>
+  </ul>
+
+  <h3>Por que os testes não foram aplicados</h3>
+  <p>
+    A base tem <strong>{{ missing_total }} valores ausentes nas {{ missing | length }} colunas</strong>. Todos os
+    quatro testes comparam linhas com e sem ausentes; sem nenhum ausente, não existem padrões de ausência para
+    comparar, e a pergunta “qual é o mecanismo?” não se coloca. A consequência prática é positiva: a análise usa a base
+    inteira, sem descartar linhas nem imputar valores.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>5. Inconsistências entre colunas</h2>
+  <p>
+    Uma inconsistência é um valor que contradiz outro da própria base (por exemplo, mais cestas convertidas do que
+    tentadas). Testamos {{ checks | length }} regras que o basquete impõe:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Regra</th><th>Colunas envolvidas</th><th class="num">Linhas inconsistentes</th></tr></thead>
+      <tbody>
+        {% for check in checks.itertuples() %}
+        <tr>
+          <td>{{ check.regra }}</td>
+          <td>{% for col in check.colunas %}<code>{{ col }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</td>
+          <td class="num">{{ check.inconsistentes }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    A função foi validada inserindo erros artificiais numa cópia da base (por exemplo, rebotes = 999): cada erro foi
+    acusado pela regra correspondente. Limite: uma regra violada indica que algo está errado entre aquelas colunas,
+    mas não qual delas.
+  </p>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>A base é confiável, com um único problema sistemático, já corrigido</h2>
+  <p>
+    <strong>O problema: os percentuais.</strong> Entre 79% e 89% dos valores das quatro colunas de aproveitamento vieram
+    fora do intervalo [0, 1]. O erro segue um padrão exato: todos os valores quebrados tinham três casas decimais
+    terminadas em dígito diferente de zero (0,554 virou 554), e todos os valores intactos tinham no máximo duas casas
+    (0,34 continuou 0,34). Esse é o comportamento de um programa configurado em português lendo “0.554”: no Brasil, o
+    ponto seguido de três dígitos é separador de milhar, como em 1.000. A causa mais provável, portanto, é a exportação
+    da planilha com configuração regional brasileira. O mesmo padrão confirma que dividir por 1000 é a correção certa,
+    e a validação recalculando cada percentual a partir das colunas de origem não encontrou nenhuma divergência.
+  </p>
+  <p>
+    <strong>Por que isso importava.</strong> Sem a correção, a média do aproveitamento de arremessos seria 417,27 em vez
+    de 0,471, e qualquer medida ou gráfico com essas colunas seria absurdo. É um bom exemplo de erro que não aparece
+    como célula vazia nem como texto estranho: o valor parece um número normal, e só a checagem de domínio o revela.
+  </p>
+  <p>
+    <strong>O restante passou em todas as verificações.</strong> Não há negativos, duplicados nem ausentes (visíveis ou
+    disfarçados de zero). Os zeros que existem têm significado válido. As 11 regras de consistência foram respeitadas
+    em todas as 2238 linhas: os totais batem com as suas partes, cada jogo tem um vencedor e um mandante, e as campanhas
+    acumuladas acompanham a sequência de jogos.
+  </p>
+  <p>
+    <strong>Consequência para a análise.</strong> As sete variáveis estudadas (pontos, rebotes, assistências, roubos,
+    tocos, faltas e cestas de 3) são contagens inteiras que não precisaram de nenhuma correção. Os resultados das seções
+    seguintes, portanto, não dependem de tratamento algum sobre elas. Os valores extremos dessas variáveis são raros,
+    mas possíveis, e por isso são tratados como outliers numa seção própria, e não como erros.
+  </p>
+  <p>
+    <strong>Limites das verificações.</strong> As regras de consistência detectam contradições entre colunas, mas não
+    um erro que seja coerente com todas elas (por exemplo, um jogo registrado com rebotes ofensivos e totais errados na
+    mesma quantidade). Além disso, a base termina em 29/03/2026, antes do fim da temporada regular: cada time tem de 74
+    a 76 jogos, e não 82. Isso é uma questão de cobertura, e não de qualidade, mas deve ser lembrado ao generalizar as
+    conclusões para a temporada inteira.
+  </p>
+</section>
+{% endblock %}

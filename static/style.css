@@ -140,6 +140,8 @@ nav a[aria-current="page"] { background: #ffffff; color: var(--header-bg); font-
   margin-bottom: 20px;
 }
 .card.interpretation { border-left: 4px solid var(--accent); }
+.card ul { padding-left: 22px; margin: 0 0 12px; }
+.card li { margin-bottom: 8px; }
 .card-label {
   display: inline-block;
   font-size: 0.75rem;
@@ -210,6 +212,35 @@ td.num, th.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* ---------- números em destaque ---------- */
+.stats { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 16px; }
+.stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--stripe);
+  border: 1px solid var(--border);
+}
+.stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat-label { color: var(--muted); font-size: 0.85rem; }
+
+/* ---------- detalhes que abrem e fecham ---------- */
+details { margin: 8px 0 12px; }
+summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+details[open] summary { margin-bottom: 8px; }
+
+/* ---------- nomes de colunas ---------- */
+code {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.86em;
+  background: var(--stripe);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
 }
 
 /* ---------- gráficos ---------- */

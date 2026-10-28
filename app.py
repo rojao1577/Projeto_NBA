@@ -1,16 +1,18 @@
+import pandas as pd
 from flask import Flask, abort, render_template, request
 
 from analysis.charts import VARIABLE_NAMES, boxplot, mean_bars, team_color, zscore_bars
-from analysis.cleaning import clean
+from analysis.cleaning import clean, convert_dates, derive_matchups, rename_columns
 from analysis.descriptive import compare_teams, outlier_games, team_table
 from analysis.formatting import format_measures
 from analysis.loader import load_raw
+from analysis.quality import (DOMAIN, ZERO_MEANING, duplicates, inconsistency_checks, missing_counts,
+                              out_of_domain, special_values, validate_percentages)
 from config import GROUP_TEAMS, VARIABLES
 
 PENDING_SECTIONS = {
     "dados": "Dados",
     "tratamento": "Tratamento",
-    "qualidade": "Qualidade dos dados",
     "outliers": "Outliers",
     "assimetria": "Assimetria",
     "cv": "Coeficiente de variação",
@@ -24,6 +26,18 @@ def team_options(df) -> list[str]:
     return GROUP_TEAMS + others
 
 
+PERCENT_FORMULAS = {
+    "aproveitamento_arremessos": "arremessos convertidos ÷ tentados",
+    "aproveitamento_3pts": "cestas de 3 convertidas ÷ tentadas",
+    "aproveitamento_lances_livres": "lances livres convertidos ÷ tentados",
+    "aproveitamento_acumulado": "vitórias ÷ (vitórias + derrotas) acumuladas",
+}
+
+
+def domain_text(low, high) -> str:
+    return f"≥ {low}" if high == float("inf") else f"{low} a {high}"
+
+
 def choose(value, options, default):
     return value if value in options else default
 
@@ -35,7 +49,9 @@ def outliers_elsewhere(df, team: str, variable: str) -> list[str]:
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    df = clean(load_raw())
+    raw = load_raw()
+    df = clean(raw)
+    before_fix = derive_matchups(rename_columns(convert_dates(raw)))
     teams = team_options(df)
 
     @app.route("/")
@@ -63,6 +79,31 @@ def create_app() -> Flask:
             variable_names=VARIABLE_NAMES, colors=colors,
             table=table, chart=chart, outliers=outliers, elsewhere=elsewhere,
             means_chart=means_chart, z_chart=z_chart,
+        )
+
+    @app.route("/qualidade")
+    def qualidade():
+        special = special_values(df)
+        domain = pd.DataFrame({
+            "dominio": {col: domain_text(low, high) for col, (low, high) in DOMAIN.items()},
+            "antes": out_of_domain(before_fix),
+            "depois": out_of_domain(df),
+        })
+        validation = pd.DataFrame({
+            "formula": PERCENT_FORMULAS,
+            "antes": validate_percentages(before_fix),
+            "depois": validate_percentages(df),
+        })
+        missing = missing_counts(df)
+        return render_template(
+            "qualidade.html",
+            numeric_columns=len(special),
+            zeros=special[(special["zeros"] > 0) | (special["negativos"] > 0)],
+            zero_meaning=ZERO_MEANING,
+            dups=duplicates(df), games=df["id_jogo"].nunique(), rows=len(df),
+            domain=domain, validation=validation,
+            missing=missing, missing_total=int(missing.sum()),
+            checks=inconsistency_checks(df),
         )
 
     @app.route("/<section>")
