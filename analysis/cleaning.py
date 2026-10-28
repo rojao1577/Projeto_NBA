@@ -2,6 +2,12 @@ import pandas as pd
 
 from analysis.dictionary import RENAME_MAP
 
+PERCENT_COLUMNS = [
+    "aproveitamento_arremessos",
+    "aproveitamento_3pts",
+    "aproveitamento_lances_livres",
+    "aproveitamento_acumulado",
+]
 
 ML_EXCLUDED = {
     "id_time": "redundante com time (mesma informação em forma de número)",
@@ -35,3 +41,10 @@ def derive_matchups(df: pd.DataFrame) -> pd.DataFrame:
 
 def ml_features(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=list(ML_EXCLUDED))
+
+
+def fix_percentages(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for col in PERCENT_COLUMNS:
+        df[col] = df[col].where(df[col] <= 1, df[col] / 1000)
+    return df

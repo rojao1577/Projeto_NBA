@@ -12,6 +12,14 @@ CLEAN_CSV = DATA_DIR / "stats_times_tratada.csv"
 GROUP_TEAMS: list[str] = ["Cleveland Cavaliers", "Boston Celtics"]
 
 
-VARIABLES = ["PTS", "REB", "AST", "STL", "BLK", "PF", "FG3M"]
+VARIABLES = [
+    "pontos",
+    "rebotes",
+    "assistencias",
+    "roubos",
+    "tocos",
+    "faltas",
+    "cestas_3_convertidas",
+]
 
 DECIMALS = 2
