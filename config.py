@@ -9,7 +9,7 @@ RAW_CSV = DATA_DIR / "stats_times_regular_final.csv"
 CLEAN_CSV = DATA_DIR / "stats_times_tratada.csv"
 
 
-GROUP_TEAMS: list[str] = ["Cleveland Cavaliers", "Boston Celtics"]
+GROUP_TEAMS: list[str] = ["Cleveland Cavaliers", "New York Knicks"]
 
 
 VARIABLES = [

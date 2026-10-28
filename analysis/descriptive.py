@@ -1,0 +1,34 @@
+import pandas as pd
+from analysis.outliers import iqr_limits, iqr_outliers
+
+
+def describe(s: pd.Series) -> pd.Series:
+    q1, q3 = s.quantile([0.25, 0.75])
+    low, high = iqr_limits(s)
+    return pd.Series({
+        "jogos": s.count(),
+        "media": s.mean(),
+        "mediana": s.median(),
+        "moda": s.mode().tolist(),
+        "minimo": s.min(),
+        "maximo": s.max(),
+        "amplitude": s.max() - s.min(),
+        "desvio_padrao": s.std(),
+        "variancia": s.var(),
+        "q1": q1,
+        "q3": q3,
+        "iqr": q3 - q1,
+        "limite_inferior": low,
+        "limite_superior": high,
+        "outliers": int(iqr_outliers(s).sum()),
+    })
+
+
+def team_table(df: pd.DataFrame, team: str, columns: list[str]) -> pd.DataFrame:
+    team_games = df[df["time"] == team]
+    return pd.DataFrame({col: describe(team_games[col]) for col in columns}).T
+
+
+def outlier_games(df: pd.DataFrame, team: str, col: str) -> pd.DataFrame:
+    team_games = df[df["time"] == team]
+    return team_games[iqr_outliers(team_games[col])][["data_jogo", "confronto", "minutos", col]]

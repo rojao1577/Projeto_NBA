@@ -101,3 +101,8 @@ def joint_flags(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     flags = pd.DataFrame({name: method(df[columns]) for name, method in MULTIVARIATE_METHODS.items()})
     flags["votos"] = flags.sum(axis=1)
     return flags
+
+
+def group_flags(df: pd.DataFrame, columns: list[str], teams: list[str]) -> pd.DataFrame:
+    flags = joint_flags(df, columns)
+    return flags[df["time"].isin(teams)]
