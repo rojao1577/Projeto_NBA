@@ -8,22 +8,27 @@
   --border: #e2e1dc;
   --stripe: #f9f9f7;
   --accent: #2a78d6;
-  --cle: #2a78d6;
+  --cle: #a3123a;
   --nyk: #eb6834;
   --notice-bg: #fff6e0;
+  --page-top: #12305c;        /* topo do degradê, perto da cor do cabeçalho */
+  --page-bottom: #0a1932;     /* fim do degradê, azul mais escuro */
+  --header-bg: #173b6e;       /* cabeçalho: azul um pouco mais claro */
+  --on-page: #f2f5fa;         /* texto direto sobre o fundo azul */
+  --on-page-muted: #b9c8de;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #141413;
-    --surface: #1d1d1c;
-    --text: #efeeea;
-    --muted: #b3b2ab;
-    --border: #34332f;
-    --stripe: #232321;
+    --surface: #11213d;
+    --text: #eef2f8;
+    --muted: #aebbd0;
+    --border: #253a5e;
+    --stripe: #162a4b;
     --accent: #5b9bea;
-    --cle: #3987e5;
+    --cle: #c8344f;
     --nyk: #d95926;
     --notice-bg: #3a2f14;
   }
@@ -32,13 +37,13 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #141413;
-  --surface: #1d1d1c;
-  --text: #efeeea;
-  --muted: #b3b2ab;
-  --border: #34332f;
-  --stripe: #232321;
+  --surface: #11213d;
+  --text: #eef2f8;
+  --muted: #aebbd0;
+  --border: #253a5e;
+  --stripe: #162a4b;
   --accent: #5b9bea;
-  --cle: #3987e5;
+  --cle: #c8344f;
   --nyk: #d95926;
   --notice-bg: #3a2f14;
 }
@@ -48,7 +53,9 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--page-top) 0%, var(--page-bottom) 100%) fixed;
+  background-color: var(--page-bottom);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
@@ -68,7 +75,9 @@ h4 { font-size: 0.95rem; margin: 16px 0 6px; }
 p { margin: 0 0 12px; }
 a { color: var(--accent); }
 
-.lead { color: var(--muted); font-size: 1.05rem; max-width: 95ch; margin-bottom: 24px; }
+/* textos que ficam direto sobre o fundo azul (fora dos cartões) */
+main > h1 { color: var(--on-page); }
+.lead { color: var(--on-page-muted); font-size: 1.05rem; max-width: 95ch; margin-bottom: 24px; }
 .nowrap { white-space: nowrap; }
 .muted { color: var(--muted); }
 .table-note { color: var(--muted); font-size: 0.82rem; margin-top: 10px; }
@@ -78,8 +87,9 @@ a { color: var(--accent); }
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
 .header-inner {
@@ -93,12 +103,12 @@ a { color: var(--accent); }
 }
 
 .brand {
-  color: var(--text);
+  color: var(--on-page);
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
-.brand span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+.brand span { display: block; color: var(--on-page-muted); font-size: 0.78rem; font-weight: 400; }
 
 nav { min-width: 0; flex: 1; }
 nav ul {
@@ -113,13 +123,13 @@ nav a {
   display: block;
   padding: 6px 10px;
   border-radius: 6px;
-  color: var(--muted);
+  color: var(--on-page-muted);
   text-decoration: none;
   white-space: nowrap;
   font-size: 0.92rem;
 }
-nav a:hover { background: var(--stripe); color: var(--text); }
-nav a[aria-current="page"] { background: var(--accent); color: #fff; }
+nav a:hover { background: rgba(255, 255, 255, 0.1); color: var(--on-page); }
+nav a[aria-current="page"] { background: #ffffff; color: var(--header-bg); font-weight: 600; }
 
 /* ---------- cartões: (a) resultados e (b) interpretação ---------- */
 .card {
@@ -227,9 +237,9 @@ td.num, th.num {
   max-width: 1080px;
   margin: 0 auto;
   padding: 24px 16px 40px;
-  color: var(--muted);
+  color: var(--on-page-muted);
   font-size: 0.85rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 @media (max-width: 600px) {

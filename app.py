@@ -1,6 +1,6 @@
 from flask import Flask, abort, render_template, request
 
-from analysis.charts import OTHER_COLOR, TEAM_COLORS, VARIABLE_NAMES, boxplot
+from analysis.charts import VARIABLE_NAMES, boxplot, mean_bars, team_color, zscore_bars
 from analysis.cleaning import clean
 from analysis.descriptive import compare_teams, outlier_games, team_table
 from analysis.formatting import format_measures
@@ -51,14 +51,18 @@ def create_app() -> Flask:
 
         table = format_measures(compare_teams(df, selected, variable))
         chart = boxplot(df, selected, variable).to_html(full_html=False, include_plotlyjs="cdn")
+        means_chart = mean_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs=False)
+        z_chart = zscore_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs=False)
+        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
         outliers = {team: outlier_games(df, team, variable).to_dict("records") for team in selected}
         elsewhere = {team: outliers_elsewhere(df, team, variable) for team in selected}
 
         return render_template(
             "descritiva.html",
             teams=teams, team_a=team_a, team_b=team_b, variable=variable,
-            variable_names=VARIABLE_NAMES, team_colors=TEAM_COLORS, other_color=OTHER_COLOR,
+            variable_names=VARIABLE_NAMES, colors=colors,
             table=table, chart=chart, outliers=outliers, elsewhere=elsewhere,
+            means_chart=means_chart, z_chart=z_chart,
         )
 
     @app.route("/<section>")

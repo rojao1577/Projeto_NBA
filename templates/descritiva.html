@@ -46,7 +46,7 @@
         <tr>
           <th>Medida</th>
           {% for team in table.columns %}
-          <th class="num"><span class="team-dot" style="background: {{ team_colors.get(team, other_color) }}"></span>{{ team }}</th>
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
           {% endfor %}
         </tr>
       </thead>
@@ -72,7 +72,7 @@
 
   <h3>Jogos outliers (IQR)</h3>
   {% for team, games in outliers.items() %}
-    <h4><span class="team-dot" style="background: {{ team_colors.get(team, other_color) }}"></span>{{ team }}</h4>
+    <h4><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</h4>
     {% if games %}
     <div class="table-wrap">
       <table>
@@ -102,6 +102,26 @@
     </p>
     {% endif %}
   {% endfor %}
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Gráficos de barras — comparação entre os times</h2>
+  <p>
+    As 7 variáveis têm escalas muito diferentes: os times fazem perto de 115 pontos por jogo, mas só cerca de 5 tocos.
+    Por isso o primeiro gráfico dá a cada variável a sua própria escala, com a média da liga como referência.
+  </p>
+  <div class="chart">{{ means_chart | safe }}</div>
+
+  <h3>Onde o z-score entra</h3>
+  <p>
+    Para comparar variáveis de escalas diferentes num gráfico só, cada média do time é padronizada em relação à liga:
+    <strong>z = (média do time − média dos 30 times) ÷ desvio padrão entre os 30 times</strong> (amostral, n − 1).
+    Assim todas ficam na mesma unidade, “desvios em relação ao time típico”: z = 0 é um time típico da NBA,
+    z = +1 está um desvio acima. O desvio usado é o <em>entre times</em>, e não o entre jogos, porque o que se compara
+    são médias de times. Um z positivo não significa “melhor”: em faltas, por exemplo, ficar acima da liga é desvantagem.
+  </p>
+  <div class="chart">{{ z_chart | safe }}</div>
 </section>
 
 <section class="card interpretation">

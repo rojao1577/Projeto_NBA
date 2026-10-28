@@ -36,3 +36,9 @@ def outlier_games(df: pd.DataFrame, team: str, col: str) -> pd.DataFrame:
 
 def compare_teams(df: pd.DataFrame, teams: list[str], col: str) -> pd.DataFrame:
     return pd.DataFrame({team: describe(df[df["time"] == team][col]) for team in teams})
+
+
+def league_zscores(df: pd.DataFrame, teams: list[str], columns: list[str]) -> pd.DataFrame:
+    means = df.groupby("time")[columns].mean()
+    z = (means - means.mean()) / means.std()
+    return z.loc[teams]
