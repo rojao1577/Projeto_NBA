@@ -17,10 +17,6 @@ from analysis.shape import (IQR_EXTREME, MODERATE, NORMAL_RANGE_IQR, NORMAL_STD_
                             rule_comparison, skew_table)
 from config import GROUP_TEAMS, VARIABLES
 
-PENDING_SECTIONS = {
-}
-
-
 def team_options(df) -> list[str]:
     others = sorted(set(df["time"]) - set(GROUP_TEAMS))
     return GROUP_TEAMS + others
@@ -323,12 +319,6 @@ def create_app() -> Flask:
             outliers=pd.DataFrame({team: team_table(df, team, VARIABLES)["outliers"] for team in GROUP_TEAMS}),
             number=number,
         )
-
-    @app.route("/<section>")
-    def pending(section):
-        if section not in PENDING_SECTIONS:
-            abort(404)
-        return render_template("em_construcao.html", title=PENDING_SECTIONS[section])
 
     return app
 

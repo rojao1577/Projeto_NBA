@@ -101,16 +101,7 @@ def counts_from_flags(flags: dict[str, pd.DataFrame], rows: pd.Series | None = N
     return pd.DataFrame({col: (f if rows is None else f[rows]).sum() for col, f in flags.items()}).T
 
 
-def outlier_counts(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    return counts_from_flags(all_column_flags(df, columns))
-
-
 def joint_flags(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     flags = pd.DataFrame({name: method(df[columns]) for name, method in MULTIVARIATE_METHODS.items()})
     flags["votos"] = flags.sum(axis=1)
     return flags
-
-
-def group_flags(df: pd.DataFrame, columns: list[str], teams: list[str]) -> pd.DataFrame:
-    flags = joint_flags(df, columns)
-    return flags[df["time"].isin(teams)]

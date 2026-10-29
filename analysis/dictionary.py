@@ -39,11 +39,6 @@ COLUMNS = [
 RENAME_MAP = {coluna: nome_novo for coluna, nome_novo, _, _ in COLUMNS}
 
 
-def overview(df: pd.DataFrame) -> dict:
-    n_rows, n_cols = df.shape
-    return {"linhas": n_rows, "colunas": n_cols}
-
-
 def data_dictionary(df: pd.DataFrame) -> pd.DataFrame:
     table = pd.DataFrame(COLUMNS, columns=["coluna", "nome_novo", "significado", "tipo"])
     table["tipo_pandas"] = table["coluna"].map(df.dtypes.astype(str))
