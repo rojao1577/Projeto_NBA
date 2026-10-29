@@ -307,6 +307,56 @@ a.on-page { color: var(--on-page); }
 .team-head { display: flex; align-items: center; gap: 20px; margin-bottom: 8px; }
 .team-head .lead { margin-bottom: 0; }
 
+/* fotos dos jogadores nas bordas da página inicial: só onde sobra espaço ao lado do conteúdo (1080 px) */
+.player { display: none; }
+@media (min-width: 1560px) {
+  main { position: relative; z-index: 1; }   /* o conteúdo fica sempre na frente das fotos */
+  .player {
+    --side: calc((100vw - 1080px) / 2);
+    display: block;
+    position: fixed;
+    bottom: 0;
+    z-index: 0;
+    width: var(--side);
+    height: min(85vh, calc(var(--side) * 1.5 + 56px));
+    margin: 0;
+    padding-top: 56px;   /* espaço livre acima da cabeça para o brilho não ser cortado */
+    pointer-events: none;
+  }
+  .player-left { left: 0; }
+  .player-right { right: 0; }
+  .player img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 100%;
+  }
+  /* profundidade: brilho na cor do time + sombra projetada para fora do conteúdo */
+  .player-left img {
+    filter: drop-shadow(0 0 22px rgba(253, 187, 48, 0.35)) drop-shadow(-16px 20px 28px rgba(0, 0, 0, 0.75));
+  }
+  .player-right img {
+    filter: drop-shadow(0 0 22px rgba(245, 132, 38, 0.35)) drop-shadow(16px 20px 28px rgba(0, 0, 0, 0.75));
+  }
+  /* a base e o lado de dentro da foto se dissolvem no fundo, sem corte reto perto do conteúdo */
+  .player {
+    --fade-top: linear-gradient(to bottom, transparent 0, #000 40px);
+    --fade-bottom: linear-gradient(to top, transparent 0, #000 22%);
+  }
+  .player-left {
+    -webkit-mask-image: var(--fade-top), var(--fade-bottom), linear-gradient(to left, transparent 0, #000 22%);
+    -webkit-mask-composite: source-in;
+    mask-image: var(--fade-top), var(--fade-bottom), linear-gradient(to left, transparent 0, #000 22%);
+    mask-composite: intersect;
+  }
+  .player-right {
+    -webkit-mask-image: var(--fade-top), var(--fade-bottom), linear-gradient(to right, transparent 0, #000 22%);
+    -webkit-mask-composite: source-in;
+    mask-image: var(--fade-top), var(--fade-bottom), linear-gradient(to right, transparent 0, #000 22%);
+    mask-composite: intersect;
+  }
+}
+
 /* ---------- rodapé ---------- */
 .site-footer {
   max-width: 1080px;

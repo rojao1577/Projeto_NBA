@@ -49,6 +49,12 @@ def outliers_elsewhere(df, team: str, variable: str) -> list[str]:
 
 LEAGUE = "liga"
 LOWER_IS_BETTER = {"faltas"}
+# decoração da página inicial: fotos oficiais da NBA (ID do jogador em nba.com/player/<id>)
+HEADSHOT_URL = "https://cdn.nba.com/headshots/nba/latest/1040x760/{}.png"
+FEATURED_PLAYERS = [
+    {"nome": "Donovan Mitchell", "time": "Cleveland Cavaliers", "id": 1628378, "lado": "left"},
+    {"nome": "Jalen Brunson", "time": "New York Knicks", "id": 1628973, "lado": "right"},
+]
 OUTLIER_PARAMS = {
     "z": od.Z_THRESHOLD, "iqr_k": od.IQR_K, "grubbs_alpha": od.GRUBBS_ALPHA,
     "contamination": od.CONTAMINATION, "knn_k": od.KNN_NEIGHBORS, "lof_k": od.LOF_NEIGHBORS,
@@ -107,6 +113,7 @@ def create_app() -> Flask:
             main_siglas={team: info.index[info["time"] == team][0] for team in GROUP_TEAMS},
             rows=len(df), games=df["id_jogo"].nunique(),
             first=df["data_jogo"].min(), last=df["data_jogo"].max(), number=number,
+            players=[{**player, "foto": HEADSHOT_URL.format(player["id"])} for player in FEATURED_PLAYERS],
         )
 
     @app.route("/time/<sigla>")

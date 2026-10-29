@@ -3,6 +3,11 @@
 {% block title %}Início{% endblock %}
 
 {% block content %}
+{% for player in players %}
+<figure class="player player-{{ player.lado }}" aria-hidden="true">
+  <img src="{{ player.foto }}" alt="" title="{{ player.nome }} ({{ player.time }})">
+</figure>
+{% endfor %}
 <h1>NBA 2025-26: Cleveland Cavaliers e New York Knicks</h1>
 <p class="lead">
   Este site analisa a temporada regular 2025-26 da NBA a partir de uma base com as estatísticas de cada time em cada
@@ -80,7 +85,8 @@
     {% endfor %}
   </div>
   <p class="table-note">
-    Logos: marcas registradas da NBA e dos times, carregados de cdn.nba.com e usados aqui apenas com fins educacionais.
+    Logos e fotos (Donovan Mitchell e Jalen Brunson): marcas registradas e imagens da NBA e dos times, carregados de
+    cdn.nba.com e usados aqui apenas com fins educacionais.
   </p>
 </section>
 {% endblock %}
