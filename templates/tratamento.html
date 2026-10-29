@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Tratamento{% endblock %}
+
+{% block content %}
+<h1>Tratamento</h1>
+<p class="lead">
+  As transformações aplicadas à base antes da análise, na ordem em que o código as executa. O arquivo original nunca é
+  alterado: o tratamento gera uma cópia com {{ clean_shape[1] }} colunas, e dela sai a versão preparada para modelos de
+  aprendizado de máquina, com {{ ml_shape[1] }}.
+</p>
+
+<section class="card">
+  <span class="card-label">Visão geral</span>
+  <h2>Etapas</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Etapa</th><th>Função</th><th class="num">Linhas × colunas</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Base original (CSV)</td><td><code>load_raw</code></td><td class="num">{{ raw_shape[0] }} × {{ raw_shape[1] }}</td></tr>
+        <tr><td>1</td><td>Converter a data e criar <code>mes</code> e <code>dia_semana</code></td><td><code>convert_dates</code></td><td class="num">{{ raw_shape[0] }} × {{ raw_shape[1] + 2 }}</td></tr>
+        <tr><td>2</td><td>Renomear as colunas</td><td><code>rename_columns</code></td><td class="num">{{ raw_shape[0] }} × {{ raw_shape[1] + 2 }}</td></tr>
+        <tr><td>3</td><td>Separar o confronto em <code>casa</code> e <code>adversario</code></td><td><code>derive_matchups</code></td><td class="num">{{ clean_shape[0] }} × {{ clean_shape[1] }}</td></tr>
+        <tr><td>4</td><td>Corrigir os percentuais (ver <a href="/qualidade">Qualidade</a>)</td><td><code>fix_percentages</code></td><td class="num">{{ clean_shape[0] }} × {{ clean_shape[1] }}</td></tr>
+        <tr><td>5</td><td>Excluir as colunas que não servem para modelos</td><td><code>ml_features</code></td><td class="num">{{ ml_shape[0] }} × {{ ml_shape[1] }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Nenhuma etapa remove linhas. As etapas 1 a 4 formam a base tratada usada em todo o site; a etapa 5 só prepara a base
+    para modelagem.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>1. O campo de data</h2>
+  <p>
+    <code>GAME_DATE</code> chegou como <strong>texto</strong> (tipo <code>{{ raw_date_type }}</code>, por exemplo
+    <code>"{{ raw_date }}"</code>). Como texto, ele não pode ser ordenado de forma confiável nem decomposto em mês ou dia
+    da semana. Foi convertido com <code>pd.to_datetime(..., format="%Y-%m-%d")</code> para o tipo
+    <code>{{ clean_date_type }}</code>.
+  </p>
+  <p>
+    <strong>Por que informar o formato:</strong> sem ele, o pandas tenta adivinhar o formato de cada valor,
+    e em formatos como <code>04/03/2026</code> não dá para saber se é 4 de março ou 3 de abril. Com o formato explícito
+    (ano-mês-dia), cada parte tem um papel fixo, e qualquer data fora do padrão gera erro em vez de virar um valor errado
+    em silêncio. Todas as
+    {{ raw_shape[0] }} datas foram convertidas sem erro: o período vai de {{ first.strftime("%d/%m/%Y") }} a
+    {{ last.strftime("%d/%m/%Y") }}.
+  </p>
+  <p>
+    Da data saíram duas colunas novas: <code>mes</code> (1 a 12) e <code>dia_semana</code> (0 = segunda a 6 = domingo).
+  </p>
+  <div class="chart">{{ dates | safe }}</div>
+  <p class="table-note">
+    Contagem de jogos, não de linhas (cada jogo conta uma vez). Outubro tem poucos jogos porque a temporada começou em
+    21/10; fevereiro tem menos por causa da pausa do All-Star Game.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>2. Novos nomes das colunas</h2>
+  <p>
+    Os nomes originais são siglas em inglês (<code>FG3M</code>, <code>OREB</code>, <code>PF</code>…), pouco claras para
+    quem não acompanha a NBA. Regras usadas nos nomes novos: <strong>português</strong>, <strong>sem siglas</strong>,
+    <strong>minúsculas</strong>, <strong>sem acento</strong> e palavras separadas por <code>_</code> (snake_case), para
+    funcionarem sem problemas no código. Nos textos do site, os nomes aparecem com acento.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Original</th><th>Novo</th><th>Significado</th></tr></thead>
+      <tbody>
+        {% for original, new, meaning, _ in renames %}
+        <tr><td><code>{{ original }}</code></td><td><code>{{ new }}</code></td><td>{{ meaning }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>3. Colunas categóricas e numéricas</h2>
+  <p>
+    O enunciado cita <code>W</code> e <code>L</code> como exemplo de colunas a tratar. Verificando a base, nenhuma
+    conversão foi necessária nelas, e o motivo foi documentado:
+  </p>
+  <ul>
+    <li>
+      <strong><code>WL</code> → <code>vitoria</code>:</strong> é o resultado do jogo, uma categoria (vitória/derrota), mas
+      já vem codificada como número. Os únicos valores presentes são
+      {% for v in wl_values %}<strong>{{ v }}</strong>{% if not loop.last %} e {% endif %}{% endfor %}
+      (1 = vitória, 0 = derrota), o formato que um modelo usa.
+    </li>
+    <li>
+      <strong><code>W</code> e <code>L</code> → <code>vitorias_acumuladas</code> e <code>derrotas_acumuladas</code>:</strong>
+      não são categorias, e sim <strong>contagens acumuladas</strong> na temporada até aquele jogo (máximos de
+      {{ max_wins }} e {{ max_losses }}). Conferimos: em <strong>{{ "%.0f" | format(cumulative) }}%</strong> das linhas elas são
+      exatamente a soma acumulada de vitórias e derrotas do time, jogo a jogo. Já são numéricas e não precisam de
+      conversão.
+    </li>
+  </ul>
+  <p>
+    <strong>A conversão que foi necessária: <code>MATCHUP</code> (confronto).</strong> É um texto como
+    <code>"ATL vs. SAC"</code> ou <code>"ATL @ BOS"</code>, que mistura duas informações. Ele foi separado em:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna nova</th><th>Como foi criada</th></tr></thead>
+      <tbody>
+        {% for col, how in derived.items() %}
+        <tr><td><code>{{ col }}</code></td><td>{{ how }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Exemplo: confronto</th><th class="num">casa</th><th>adversario</th></tr></thead>
+      <tbody>
+        {% for ex in examples %}
+        <tr><td><code>{{ ex.confronto }}</code></td><td class="num">{{ ex.casa }}</td><td>{{ ex.adversario }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Resultado: {{ home }} linhas com <code>casa = 1</code> e {{ away }} com <code>casa = 0</code> (um mandante por jogo,
+    como esperado) e {{ opponents }} adversários diferentes. O <code>adversario</code> continua <strong>categórico</strong>:
+    numerá-lo de 1 a 30 criaria uma ordem falsa (como se o time 30 fosse “maior” que o time 1). Num modelo, o caminho seria
+    o <em>one-hot encoding</em>, uma coluna 0/1 para cada adversário.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>4. Colunas excluídas para aprendizado de máquina</h2>
+  <p>
+    Um modelo de previsão (por exemplo, prever a vitória a partir das estatísticas do jogo) só deve receber colunas que
+    ajudam a generalizar e que não “entregam” a resposta. Saem {{ excluded | length }} colunas:
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Coluna</th><th>Motivo da exclusão</th></tr></thead>
+      <tbody>
+        {% for col, reason in excluded.items() %}
+        <tr><td><code>{{ col }}</code></td><td>{{ reason }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p>
+    A base para modelos fica com <strong>{{ ml_shape[0] }} × {{ ml_shape[1] }}</strong>. Os três casos que merecem
+    explicação:
+  </p>
+  <ul>
+    <li>
+      <strong>Vazamento de dados (<em>data leakage</em>).</strong> As colunas acumuladas são atualizadas <em>depois</em>
+      do jogo: as vitórias acumuladas de uma linha já incluem a vitória daquela partida. Um modelo que as recebesse
+      “acertaria” o resultado olhando para a própria resposta, e falharia com jogos novos.
+    </li>
+    <li>
+      <strong>Mantidas de propósito: <code>time</code> e <code>adversario</code>.</strong> A força dos dois times é
+      informação legítima, conhecida antes do jogo, e manter só um deles seria incoerente. Num modelo, ambos entrariam
+      por one-hot encoding.
+    </li>
+    <li>
+      <strong>Redundâncias mantidas.</strong> Algumas colunas são combinação exata de outras: rebotes = ofensivos +
+      defensivos; pontos = 2 × arremessos convertidos + cestas de 3 + lances livres; os aproveitamentos são convertidos
+      ÷ tentados. Elas foram mantidas porque são variáveis pedidas no projeto (pontos, rebotes) e porque a escolha entre
+      a total e as partes depende do modelo; num modelo linear, seria preciso tirar uma delas.
+    </li>
+  </ul>
+  <p class="notice">
+    Excluir para aprendizado de máquina <strong>não</strong> é excluir do site: toda a análise usa a base tratada
+    completa, com {{ clean_shape[1] }} colunas. A data, por exemplo, sai do modelo, mas continua nos gráficos e nas
+    tabelas de outliers.
+  </p>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>Por que essas decisões</h2>
+  <ul>
+    <li>
+      <strong>A base original nunca é alterada.</strong> Todo o tratamento é feito sobre uma cópia, por funções que
+      recebem a base e devolvem outra. Assim qualquer resultado pode ser refeito a partir do arquivo original.
+    </li>
+    <li>
+      <strong>Verificar antes de converter.</strong> O enunciado sugere tratar <code>W</code> e <code>L</code> como
+      categóricas, mas a verificação mostrou que elas já são contagens numéricas corretas (100% de concordância com o
+      resultado jogo a jogo). Converter sem olhar teria criado um problema onde não havia.
+    </li>
+    <li>
+      <strong>Toda transformação acrescenta, nenhuma apaga.</strong> A data e o confronto originais continuam na base
+      tratada ao lado das colunas derivadas, então é sempre possível conferir uma com a outra. As exclusões só acontecem
+      na versão para modelos.
+    </li>
+  </ul>
+</section>
+{% endblock %}

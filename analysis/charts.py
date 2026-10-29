@@ -427,3 +427,25 @@ def iqr_ranges(df, teams, columns):
         legend=dict(orientation="h", y=-0.14),
     )
     return fig
+
+
+MONTH_ABBREVIATIONS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+SINGLE_COLOR = "#2a78d6"
+
+
+def date_bars(by_month, by_weekday):
+    months = [f"{MONTH_ABBREVIATIONS[p.month - 1]}/{p.year}" for p in by_month.index]
+    fig = make_subplots(rows=1, cols=2, column_widths=[0.5, 0.5], horizontal_spacing=0.08,
+                        subplot_titles=["Jogos por mês", "Jogos por dia da semana"])
+    for x, counts, col in [(months, by_month, 1), (list(by_weekday.index), by_weekday, 2)]:
+        fig.add_trace(go.Bar(
+            x=x, y=counts.values, marker=dict(color=SINGLE_COLOR, cornerradius=4), showlegend=False,
+            text=counts.values, textposition="outside",
+            hovertext=[f"{label}: {n} jogos" for label, n in zip(x, counts.values)], hoverinfo="text",
+        ), row=1, col=col)
+        fig.update_yaxes(title_text="Jogos", rangemode="tozero", range=[0, counts.max() * 1.15], row=1, col=col)
+    fig.update_layout(
+        title="Distribuição dos 1119 jogos no calendário (a partir de data_jogo)",
+        template="plotly_white", height=420, separators=",.", bargap=0.3,
+    )
+    return fig

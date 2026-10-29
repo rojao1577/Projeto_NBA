@@ -1,10 +1,12 @@
 import pandas as pd
 from flask import Flask, abort, render_template, request
 
-from analysis.charts import (VARIABLE_NAMES, boxplot, cv_bars, histogram_kde, iqr_ranges, mean_bars, method_heatmap,
-                             method_strip, team_dot, team_palette, votes_bars, zscore_bars)
-from analysis.cleaning import clean, convert_dates, derive_matchups, rename_columns
+from analysis.charts import (VARIABLE_NAMES, boxplot, cv_bars, date_bars, histogram_kde, iqr_ranges, mean_bars,
+                             method_heatmap, method_strip, team_dot, team_palette, votes_bars, zscore_bars)
+from analysis.cleaning import (DERIVED_COLUMNS, ML_EXCLUDED, clean, convert_dates, derive_matchups, games_by_month,
+                               games_by_weekday, ml_features, rename_columns)
 from analysis.descriptive import compare_teams, outlier_games, team_table
+from analysis.dictionary import COLUMNS, data_dictionary, games_per_team
 from analysis.formatting import format_measures, number
 from analysis import outliers as od
 from analysis.loader import load_raw
@@ -16,8 +18,6 @@ from analysis.shape import (IQR_EXTREME, MODERATE, NORMAL_RANGE_IQR, NORMAL_STD_
 from config import GROUP_TEAMS, VARIABLES
 
 PENDING_SECTIONS = {
-    "dados": "Dados",
-    "tratamento": "Tratamento",
     "sintese": "Síntese",
 }
 
@@ -63,6 +63,14 @@ def flagged_games(df, joint, rows, min_votes: int) -> list[dict]:
     games["votos"] = joint.loc[selected, "votos"]
     games["metodos"] = [", ".join(methods.columns[row]) for row in methods.to_numpy()]
     return games.sort_values(["votos", "data_jogo"], ascending=[False, True]).to_dict("records")
+
+
+def cumulative_matches(df) -> float:
+    ordered = df.sort_values(["time", "data_jogo"])
+    wins = ordered.groupby("time")["vitoria"].cumsum()
+    losses = ordered.groupby("time")["vitoria"].transform(lambda s: (1 - s).cumsum())
+    same = (ordered["vitorias_acumuladas"] == wins) & (ordered["derrotas_acumuladas"] == losses)
+    return same.mean() * 100
 
 
 def create_app() -> Flask:
@@ -219,6 +227,35 @@ def create_app() -> Flask:
             robust={team: robustness(s) for team, s in series.items()},
             rules={team: rule_comparison(s) for team, s in series.items()},
             normal_std=NORMAL_STD_IQR, normal_range=NORMAL_RANGE_IQR, extreme=IQR_EXTREME, number=number,
+        )
+
+    @app.route("/dados")
+    def dados():
+        dictionary = data_dictionary(raw)
+        per_team = games_per_team(df)
+        return render_template(
+            "dados.html",
+            rows=len(raw), columns=raw.shape[1], teams_count=df["time"].nunique(), games=df["id_jogo"].nunique(),
+            first=df["data_jogo"].min(), last=df["data_jogo"].max(),
+            per_team=per_team, per_team_counts=per_team.value_counts().sort_index(),
+            dictionary=dictionary,
+            concept_counts=dictionary["tipo"].value_counts(), pandas_counts=dictionary["tipo_pandas"].value_counts(),
+        )
+
+    @app.route("/tratamento")
+    def tratamento():
+        dates = date_bars(games_by_month(df), games_by_weekday(df)).to_html(full_html=False, include_plotlyjs="cdn")
+        return render_template(
+            "tratamento.html",
+            raw_date=raw["GAME_DATE"].iloc[0], raw_date_type=str(raw["GAME_DATE"].dtype),
+            clean_date_type=str(df["data_jogo"].dtype), first=df["data_jogo"].min(), last=df["data_jogo"].max(),
+            dates=dates, renames=COLUMNS,
+            wl_values=sorted(df["vitoria"].unique()), cumulative=cumulative_matches(df),
+            max_wins=df["vitorias_acumuladas"].max(), max_losses=df["derrotas_acumuladas"].max(),
+            home=int(df["casa"].sum()), away=int((df["casa"] == 0).sum()), opponents=df["adversario"].nunique(),
+            examples=df[["confronto", "casa", "adversario"]].drop_duplicates("casa").to_dict("records"),
+            derived=DERIVED_COLUMNS, excluded=ML_EXCLUDED,
+            raw_shape=raw.shape, clean_shape=df.shape, ml_shape=ml_features(df).shape,
         )
 
     @app.route("/<section>")

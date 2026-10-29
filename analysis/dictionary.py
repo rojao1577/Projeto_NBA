@@ -46,3 +46,7 @@ def data_dictionary(df: pd.DataFrame) -> pd.DataFrame:
     table = pd.DataFrame(COLUMNS, columns=["coluna", "nome_novo", "significado", "tipo"])
     table["tipo_pandas"] = table["coluna"].map(df.dtypes.astype(str))
     return table
+
+
+def games_per_team(df: pd.DataFrame) -> pd.Series:
+    return df["time"].value_counts().sort_index()

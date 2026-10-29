@@ -1,6 +1,17 @@
 import pandas as pd
 from analysis.dictionary import RENAME_MAP
 
+
+WEEKDAYS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
+
+DERIVED_COLUMNS = {
+    "mes": "data_jogo → mês do jogo (1 = janeiro … 12 = dezembro)",
+    "dia_semana": "data_jogo → dia da semana (0 = segunda … 6 = domingo)",
+    "casa": "confronto → 1 se tem ' vs. ' (jogo em casa), 0 se tem ' @ ' (jogo fora)",
+    "adversario": "confronto → última sigla do texto (ex.: 'ATL @ BOS' → BOS)",
+}
+
+
 PERCENT_COLUMNS = [
     "aproveitamento_arremessos",
     "aproveitamento_3pts",
@@ -54,3 +65,16 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df = rename_columns(df)
     df = derive_matchups(df)
     return fix_percentages(df)
+
+
+def unique_games(df: pd.DataFrame) -> pd.DataFrame:
+    return df.drop_duplicates("id_jogo")
+
+
+def games_by_month(df: pd.DataFrame) -> pd.Series:
+    return unique_games(df)["data_jogo"].dt.to_period("M").value_counts().sort_index()
+
+
+def games_by_weekday(df: pd.DataFrame) -> pd.Series:
+    counts = unique_games(df)["dia_semana"].value_counts().sort_index()
+    return counts.rename(index=dict(enumerate(WEEKDAYS)))

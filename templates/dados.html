@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Dados{% endblock %}
+
+{% block content %}
+<h1>Dados</h1>
+<p class="lead">
+  A base reúne as estatísticas de cada time em cada jogo da temporada regular 2025-26 da NBA. Esta página descreve o
+  tamanho da base, o que cada linha representa e o significado e o tipo de cada coluna.
+</p>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Tamanho e contexto</h2>
+  <div class="stats">
+    <div class="stat"><span class="stat-value">{{ rows }}</span><span class="stat-label">linhas</span></div>
+    <div class="stat"><span class="stat-value">{{ columns }}</span><span class="stat-label">colunas</span></div>
+    <div class="stat"><span class="stat-value">{{ teams_count }}</span><span class="stat-label">times</span></div>
+    <div class="stat"><span class="stat-value">{{ games }}</span><span class="stat-label">jogos</span></div>
+  </div>
+  <p>
+    <strong>Cada linha é um time em um jogo.</strong> A unidade da base não é o jogador nem o jogo: é o
+    <em>desempenho de um time numa partida</em>. Por isso cada jogo aparece em <strong>duas linhas</strong>, uma para cada
+    lado ({{ games }} jogos × 2 = {{ rows }} linhas), e as colunas de pontos, rebotes, assistências etc. são as do time
+    daquela linha.
+  </p>
+  <p>
+    <strong>Período:</strong> de {{ first.strftime("%d/%m/%Y") }} a {{ last.strftime("%d/%m/%Y") }}. A temporada regular
+    tem 82 jogos por time, mas a base termina antes do fim: cada time tem entre {{ per_team.min() }} e
+    {{ per_team.max() }} jogos.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="num">Jogos na base</th><th class="num">Times</th></tr></thead>
+      <tbody>
+        {% for n, count in per_team_counts.items() %}
+        <tr><td class="num">{{ n }}</td><td class="num">{{ count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <details>
+    <summary>Ver os jogos de cada um dos {{ teams_count }} times</summary>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th class="num">Jogos</th></tr></thead>
+        <tbody>
+          {% for team, n in per_team.items() %}
+          <tr><td>{{ team }}</td><td class="num">{{ n }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Tipos de dados</h2>
+  <p>
+    Cada coluna tem dois “tipos”. O <strong>tipo conceitual</strong> diz o que o dado <em>significa</em> e quais contas
+    fazem sentido com ele; é o que importa para quem lê a análise. O <strong>tipo no pandas</strong> diz como o computador
+    guardou o dado ao ler o CSV; é o que importa para a equipe de desenvolvimento. Os dois nem sempre coincidem:
+  </p>
+  <ul>
+    <li>
+      <strong>Números que são rótulos:</strong> <code>Team_ID</code> e <code>Game_ID</code> foram lidos como inteiros, mas
+      são identificadores. A média dos <code>Team_ID</code> não tem significado, assim como não faz sentido somar números
+      de telefone. Por isso são <strong>categóricas</strong>.
+    </li>
+    <li>
+      <strong>Data guardada como texto:</strong> <code>GAME_DATE</code> veio como texto (<code>"2026-03-28"</code>). Para
+      ordenar por data, calcular intervalos ou extrair o mês, ela precisa ser convertida (ver
+      <a href="/tratamento">Tratamento</a>).
+    </li>
+    <li>
+      <strong>Binária guardada como número:</strong> <code>WL</code> só tem os valores 0 e 1 (derrota e vitória). É uma
+      categoria de duas opções, já codificada como número.
+    </li>
+  </ul>
+  <div class="stats">
+    {% for kind, n in concept_counts.items() %}
+    <div class="stat"><span class="stat-value">{{ n }}</span><span class="stat-label">{{ kind }}</span></div>
+    {% endfor %}
+  </div>
+  <p class="table-note">
+    No pandas:
+    {% for kind, n in pandas_counts.items() %}{{ n }} × <code>{{ kind }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+    (<code>int64</code> = inteiro, <code>float64</code> = decimal, <code>str</code> = texto).
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">Apêndice</span>
+  <h2>Dicionário de dados</h2>
+  <p>
+    As {{ columns }} colunas da base original, na ordem do arquivo, com o nome novo usado no restante do projeto (ver
+    <a href="/tratamento">Tratamento</a>).
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Coluna original</th><th>Nome novo</th><th>Significado</th><th>Tipo conceitual</th><th>Tipo no pandas</th></tr>
+      </thead>
+      <tbody>
+        {% for row in dictionary.itertuples() %}
+        <tr>
+          <td><code>{{ row.coluna }}</code></td>
+          <td><code>{{ row.nome_novo }}</code></td>
+          <td>{{ row.significado }}</td>
+          <td>{{ row.tipo }}</td>
+          <td><code>{{ row.tipo_pandas }}</code></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    O tipo no pandas é o da leitura do CSV original, antes de qualquer tratamento. As 4 colunas criadas no tratamento
+    (<code>mes</code>, <code>dia_semana</code>, <code>casa</code> e <code>adversario</code>) estão descritas na página
+    <a href="/tratamento">Tratamento</a>.
+  </p>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>O que isso significa para a análise</h2>
+  <ul>
+    <li>
+      <strong>Unidade de análise.</strong> Como cada linha é um time num jogo, todas as medidas do projeto (média de
+      pontos, CV, IQR…) descrevem o <em>desempenho por jogo</em> de cada time. Ao contar jogos, é preciso lembrar que cada
+      partida aparece duas vezes.
+    </li>
+    <li>
+      <strong>Amostras equilibradas, mas incompletas.</strong> Todos os times têm de 74 a 76 jogos (90% a 93% da
+      temporada), então as comparações entre times são justas. Os totais, porém, não são os da temporada completa, e o
+      Cleveland Cavaliers (74) e o New York Knicks (75) ainda tinham jogos a disputar.
+    </li>
+    <li>
+      <strong>O tipo conceitual decide a análise.</strong> As medidas descritivas só fazem sentido nas colunas
+      numéricas. Nas categóricas (time, IDs), o que cabe é contar e agrupar; na data, ordenar e extrair partes.
+    </li>
+  </ul>
+</section>
+{% endblock %}
