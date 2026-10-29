@@ -16,6 +16,7 @@
   --header-bg: #173b6e;       /* cabeçalho: azul um pouco mais claro */
   --on-page: #f2f5fa;         /* texto direto sobre o fundo azul */
   --on-page-muted: #b9c8de;
+  --dot-ring: rgba(0, 0, 0, 0.25);   /* contorno das bolinhas dos times */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,6 +32,7 @@
     --cle: #c8344f;
     --nyk: #d95926;
     --notice-bg: #3a2f14;
+    --dot-ring: rgba(255, 255, 255, 0.75);
   }
 }
 
@@ -46,6 +48,7 @@
   --cle: #c8344f;
   --nyk: #d95926;
   --notice-bg: #3a2f14;
+  --dot-ring: rgba(255, 255, 255, 0.75);
 }
 
 /* ---------- base ---------- */
@@ -259,7 +262,7 @@ code {
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: baseline;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);   /* contorno para cores claras (ex.: branco do Nets) */
+  box-shadow: 0 0 0 1.5px var(--dot-ring);   /* contorno: escuro no modo claro, claro no escuro */
 }
 .team-dot.cle { background: var(--cle); }
 .team-dot.nyk { background: var(--nyk); }

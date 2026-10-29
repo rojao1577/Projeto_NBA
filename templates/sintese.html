@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Síntese{% endblock %}
+
+{% block content %}
+<h1>Síntese</h1>
+<p class="lead">
+  As conclusões do projeto sobre o Cleveland Cavaliers e o New York Knicks, reunindo o que cada seção mostrou, com a
+  liga (os 30 times) como referência.
+</p>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Campanha</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Medida</th>
+          {% for team in main %}
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Vitórias – derrotas</td>
+          {% for team in main %}<td class="num">{{ record.loc[team, "vitorias"] }} – {{ record.loc[team, "derrotas"] }}</td>{% endfor %}
+        </tr>
+        <tr>
+          <td>Aproveitamento</td>
+          {% for team in main %}
+          <td class="num">{{ number(record.loc[team, "aproveitamento"] * 100) }}%<span class="cell-note">{{ record_ranks.loc[team, "aproveitamento"] }}º da liga</span></td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Pontos marcados por jogo</td>
+          {% for team in main %}
+          <td class="num">{{ number(record.loc[team, "pontos"]) }}<span class="cell-note">{{ record_ranks.loc[team, "pontos"] }}º maior</span></td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Pontos sofridos por jogo</td>
+          {% for team in main %}
+          <td class="num">{{ number(record.loc[team, "sofridos"]) }}<span class="cell-note">{{ record_ranks.loc[team, "sofridos"] }}º menor</span></td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Saldo de pontos por jogo</td>
+          {% for team in main %}
+          <td class="num">+{{ number(record.loc[team, "saldo"]) }}<span class="cell-note">{{ record_ranks.loc[team, "saldo"] }}º da liga</span></td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Vitórias em casa / fora</td>
+          {% for team in main %}
+          <td class="num">{{ number(record.loc[team, "casa"] * 100) }}% / {{ number(record.loc[team, "fora"] * 100) }}%</td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Pontos sofridos = pontos do adversário na mesma partida (a outra linha do mesmo <code>id_jogo</code>). Na liga, o
+    mandante vence {{ number(league_home * 100) }}% dos jogos.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Quadro geral das 7 variáveis</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Variável</th>
+          <th rowspan="2" class="num">Média da liga</th>
+          {% for team in main %}
+          <th colspan="6" class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for team in main %}
+          <th class="num">Média</th><th class="num">z</th><th class="num">CV (%)</th><th class="num">IQR</th>
+          <th class="num">G1</th><th class="num">Outliers</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          <td class="num">{{ number(league_means[col]) }}</td>
+          {% for team in main %}
+          <td class="num">{{ number(means.loc[col, team]) }}<span class="cell-note">{{ mean_ranks.loc[col, team] }}º</span></td>
+          <td class="num">{{ number(z.loc[col, team]) }}</td>
+          <td class="num">{{ number(cv.loc[col, team]) }}</td>
+          <td class="num">{{ number(iqr.loc[col, team]) }}</td>
+          <td class="num">{{ number(skew.loc[col, team]) }}</td>
+          <td class="num">{{ outliers.loc[col, team] | int }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Média por jogo e posição na liga (1º = maior média); z-score da média do time em relação aos 30 times; CV com desvio
+    amostral; IQR com quartis por interpolação linear; G1 = assimetria de Fisher-Pearson ajustada; outliers pela regra
+    1,5 × IQR dentro do próprio time. Detalhes em <a href="/descritiva">Descritiva</a>, <a href="/assimetria">Assimetria</a>,
+    <a href="/cv">CV</a> e <a href="/iqr">IQR</a>.
+  </p>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>Conclusões</h2>
+
+  <h3>1. A base é confiável depois do tratamento</h3>
+  <p>
+    O único problema real da base foram os <strong>percentuais sem o “0,”</strong> (554 em vez de 0,554), corrigidos e
+    validados recalculando cada um a partir de convertidos ÷ tentados (página <a href="/qualidade">Qualidade</a>). Não há
+    valores ausentes, duplicados nem violações das 11 regras de consistência. Os outliers encontrados são jogos reais,
+    parte deles com prorrogação, e por isso <strong>nenhum foi removido</strong>; nenhum jogo do CLE ou do NYK foi marcado
+    pelos métodos multivariados (página <a href="/outliers">Outliers</a>).
+  </p>
+
+  <h3>2. Dois times de elite, com estilos opostos</h3>
+  <p>
+    As campanhas são quase iguais: 46–28 (62,16%, 8º) para o CLE e 48–27 (64,00%, 6º) para o NYK. O caminho até elas é
+    diferente:
+  </p>
+  <ul>
+    <li>
+      <strong>Cleveland Cavaliers: um time de ataque.</strong> É o 3º que mais pontua na liga (119,39 por jogo,
+      z = +1,24), com assistências (8º) e cestas de 3 (8º) acima da média, o retrato de um ataque coletivo e de perímetro.
+      Na defesa, porém, sofre 115,16 pontos por jogo, praticamente a média da liga (15º), e o saldo de +4,23 é só o 9º.
+    </li>
+    <li>
+      <strong>New York Knicks: um time de rebote e defesa.</strong> É o 7º em rebotes (45,91, z = +1,00) e sofre só
+      110,51 pontos por jogo, a 5ª melhor defesa por esse critério. Com isso tem o melhor saldo dos dois (+6,31, 5º da
+      liga), mesmo marcando menos pontos. O ponto fraco é a proteção do aro: é o 27º de 30 em tocos (3,99, z = −1,29).
+    </li>
+  </ul>
+
+  <h3>3. O CLE é o mais regular</h3>
+  <p>
+    Pelo IQR, a faixa central dos jogos do CLE é mais estreita em <strong>6 das 7 variáveis</strong> (o NYK só em rebotes),
+    e pelo CV o CLE está entre os mais regulares da liga em cestas de 3 (3º) e pontos (10º). O ataque do NYK é dos mais
+    irregulares da NBA (28º de 30 no CV de pontos, amplitude de 80 a 146). Outra diferença: o NYK depende muito do mando
+    de campo (75,00% de vitórias em casa contra 53,85% fora), bem mais que a média da liga (54,96% para o mandante); o
+    CLE vence quase igual nos dois lados (63,16% e 61,11%).
+  </p>
+
+  <h3>4. A forma das distribuições</h3>
+  <p>
+    Quase todas as distribuições são <strong>aproximadamente simétricas</strong>: média e mediana ficam próximas e a média
+    representa bem o valor típico. A exceção é <strong>rebotes do NYK</strong> (G1 = −0,77, assimetria moderada à
+    esquerda), puxada por poucos jogos muito abaixo do normal, onde a mediana (46) é a medida mais segura. O CV alto de
+    tocos e roubos de bola (~30% a 50%) é, em boa parte, efeito do tamanho pequeno das médias e não irregularidade dos
+    times, e o IQR confirma, como medida robusta, onde os extremos inflam o desvio e a amplitude.
+  </p>
+
+  <h3>5. Limitações</h3>
+  <ul>
+    <li>
+      <strong>Temporada incompleta:</strong> a base termina em 29/03/2026, com 74 a 76 dos 82 jogos de cada time; as
+      posições na liga podem mudar até o fim da temporada.
+    </li>
+    <li>
+      <strong>Análise univariada:</strong> cada variável foi estudada sozinha. As conclusões de estilo (ataque × defesa)
+      descrevem os números, mas não provam causa: o projeto não mede, por exemplo, se mais rebotes <em>levam</em> a mais
+      vitórias. Esse é o próximo passo natural, com análise bivariada e modelos usando a base preparada na página
+      <a href="/tratamento">Tratamento</a>.
+    </li>
+    <li>
+      <strong>Contagens pequenas:</strong> em tocos e roubos de bola, medidas relativas (CV) e baseadas em quartis
+      (IQR, CV robusto) mudam aos saltos, e diferenças pequenas entre os times devem ser lidas como empate técnico.
+    </li>
+  </ul>
+</section>
+{% endblock %}

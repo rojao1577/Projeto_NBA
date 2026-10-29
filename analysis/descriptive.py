@@ -42,3 +42,20 @@ def league_zscores(df: pd.DataFrame, teams: list[str], columns: list[str]) -> pd
     means = df.groupby("time")[columns].mean()
     z = (means - means.mean()) / means.std()
     return z.loc[teams]
+
+
+def points_against(df: pd.DataFrame) -> pd.Series:
+    return df.groupby("id_jogo")["pontos"].transform("sum") - df["pontos"]
+
+
+def team_record(df: pd.DataFrame) -> pd.DataFrame:
+    games = df.assign(sofridos=points_against(df))
+    record = games.groupby("time").agg(
+        jogos=("vitoria", "size"), vitorias=("vitoria", "sum"), aproveitamento=("vitoria", "mean"),
+        pontos=("pontos", "mean"), sofridos=("sofridos", "mean"),
+    )
+    record["derrotas"] = record["jogos"] - record["vitorias"]
+    record["saldo"] = record["pontos"] - record["sofridos"]
+    record["casa"] = games[games["casa"] == 1].groupby("time")["vitoria"].mean()
+    record["fora"] = games[games["casa"] == 0].groupby("time")["vitoria"].mean()
+    return record

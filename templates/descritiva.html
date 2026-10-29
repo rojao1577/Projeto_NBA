@@ -126,6 +126,45 @@
 
 <section class="card interpretation">
   <span class="card-label">(b) Interpretação</span>
-  <p class="muted">Texto crítico sobre o Cleveland Cavaliers e o New York Knicks: em construção.</p>
+  <h2>O que os resultados mostram sobre o Cleveland Cavaliers e o New York Knicks</h2>
+  <ul>
+    <li>
+      <strong>O CLE se destaca no ataque.</strong> Com média de 119,39 pontos por jogo (mediana 118), é o
+      <strong>3º maior ataque da liga</strong> (z = +1,24). O jogo coletivo acompanha: 28,30 assistências (8º, z = +0,91)
+      e 14,50 cestas de 3 (8º, z = +0,77). O NYK também pontua acima da média da liga (116,81, 10º), mas com menos folga.
+    </li>
+    <li>
+      <strong>O NYK se destaca no rebote e tem o seu ponto fraco nos tocos.</strong> São 45,91 rebotes por jogo, o 7º
+      maior valor da liga (z = +1,00), contra 44,31 do CLE. Em tocos, porém, o NYK é o <strong>27º de 30</strong>
+      (3,99 por jogo, z = −1,29), o maior desvio negativo dos dois times. Em roubos de bola e faltas os dois ficam perto da
+      média da liga (|z| &lt; 0,4).
+    </li>
+    <li>
+      <strong>Média e mediana quase coincidem; a moda é a medida menos estável.</strong> Nas 14 combinações time ×
+      variável, a média e a mediana ficam a menos de 1,4 unidade uma da outra, sinal de distribuições aproximadamente
+      simétricas (confirmado na página <a href="/assimetria">Assimetria</a>). A moda varia mais: nos pontos do CLE ela é
+      113, seis pontos abaixo da média, e nas cestas de 3 do CLE há empate (12 e 13). Em contagens com muitos valores
+      possíveis, o valor mais frequente aparece só algumas vezes a mais que os vizinhos, então pouco representa o time.
+    </li>
+    <li>
+      <strong>O ataque do NYK é mais irregular.</strong> O desvio padrão dos pontos do NYK é 14,16 (contra 12,54 do CLE) e
+      a amplitude vai de 80 a 146 pontos (66, contra 55 do CLE). Na prática, é mais difícil prever quantos pontos o NYK
+      vai fazer num jogo. A comparação da regularidade entre variáveis diferentes está na página <a href="/cv">CV</a>.
+    </li>
+    <li>
+      <strong>Poucos outliers, e nenhum em pontos.</strong> Pelos limites de 1,5 × IQR de cada time, o CLE tem outliers
+      em roubos de bola (3) e tocos (1); o NYK, em rebotes (4: os jogos de 24, 29, 30 e 61 rebotes), assistências (1, os
+      44 contra o DEN) e tocos (1, os 10 contra o DAL). Nenhum dos dois tem jogo fora dos limites em pontos. Os outliers
+      dos rebotes do NYK, quase todos por baixo, são os que mais afetam as medidas: ver
+      <a href="/assimetria">Assimetria</a> e <a href="/iqr">IQR</a>.
+    </li>
+    <li>
+      <strong>Onde o z-score entra.</strong> O gráfico de barras com escala própria mostra cada variável sozinha; o
+      z-score põe as 7 na mesma régua (desvios em relação ao time típico da NBA). É ele que permite dizer, por exemplo,
+      que o destaque positivo do CLE em pontos (+1,24) é maior que o do NYK em rebotes (+1,00), mesmo sendo variáveis com
+      unidades e escalas diferentes. Lembrando que z positivo não quer dizer “melhor”: em faltas, ficar acima da liga é
+      desvantagem.
+    </li>
+  </ul>
 </section>
 {% endblock %}
