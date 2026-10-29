@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Assimetria{% endblock %}
+
+{% block content %}
+<h1>Assimetria</h1>
+<p class="lead">
+  A assimetria mostra se os jogos se espalham por igual dos dois lados do valor típico ou se um dos lados tem uma
+  “cauda” mais longa. Calculamos o coeficiente para as 7 variáveis de cada time, classificamos a direção e a
+  intensidade e conferimos o resultado com o histograma e o boxplot.
+</p>
+
+<section class="card">
+  <form class="filters" method="get" action="/assimetria">
+    <label>Time A
+      <select name="time_a">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_a %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Time B
+      <select name="time_b">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_b %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Variável (gráficos)
+      <select name="variavel">
+        {% for col, name in variable_names.items() %}
+        <option value="{{ col }}" {% if col == variable %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Ver</button>
+  </form>
+</section>
+
+<section class="card">
+  <span class="card-label">Método</span>
+  <h2>Fórmula e critério</h2>
+  <p>
+    Usamos o <strong>coeficiente de assimetria de Fisher-Pearson ajustado (G1)</strong>, o mesmo do pandas
+    (<code>Series.skew()</code>) e do SciPy com <code>bias=False</code>. Primeiro calcula-se o coeficiente de momento
+    <strong>g1 = m3 ÷ m2<sup>3/2</sup></strong>, em que m2 e m3 são as médias de (x − média)² e de (x − média)³;
+    depois aplica-se a correção para amostras pequenas: <strong>G1 = g1 × √(n·(n − 1)) ÷ (n − 2)</strong>.
+  </p>
+  <p>
+    <strong>Por que este coeficiente:</strong> o cubo preserva o sinal, então jogos muito acima da média empurram o
+    valor para cima e jogos muito abaixo, para baixo. A correção importa porque cada time tem só 74 a 76 jogos, e o g1
+    sem ajuste subestima a assimetria em amostras pequenas. O coeficiente de Bowley, baseado em quartis, seria uma
+    alternativa robusta, mas nestas variáveis (contagens inteiras com muitos empates) os quartis quase não mudam
+    de um time para outro e o Bowley fica pouco sensível; além disso, ele ignora tudo o que está fora dos quartis,
+    justamente onde ficam as caudas.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Classificação</th><th>Critério</th></tr></thead>
+      <tbody>
+        <tr><td>Direção: à direita (positiva)</td><td>G1 &gt; 0: cauda mais longa para os valores altos</td></tr>
+        <tr><td>Direção: à esquerda (negativa)</td><td>G1 &lt; 0: cauda mais longa para os valores baixos</td></tr>
+        <tr><td>Intensidade: aproximadamente simétrica</td><td>|G1| &lt; {{ number(moderate) }}</td></tr>
+        <tr><td>Intensidade: moderada</td><td>{{ number(moderate) }} ≤ |G1| &lt; {{ number(strong) }}</td></tr>
+        <tr><td>Intensidade: forte</td><td>|G1| ≥ {{ number(strong) }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Coeficiente de assimetria por variável e por time</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th>
+          {% for team in skew.columns %}
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+          <th class="num">Liga (todos os jogos)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, row in skew.iterrows() %}
+        <tr>
+          <td>{{ variable_names[col] }}</td>
+          {% for g in row %}
+          <td class="num">
+            <strong>{{ number(g) }}</strong>
+            <span class="cell-note">{{ intensity(g) }}{% if intensity(g) != "aproximadamente simétrica" %}, {{ direction(g) }}{% endif %}</span>
+          </td>
+          {% endfor %}
+          <td class="num">
+            {{ number(league[col]) }}
+            <span class="cell-note">{{ intensity(league[col]) }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Coeficiente G1 (Fisher-Pearson ajustado), 2 casas decimais. Nas células aproximadamente simétricas a direção é
+    dada só pelo sinal. A coluna da liga junta os 2238 jogos dos 30 times e serve de referência.
+  </p>
+
+  <h3>{{ variable_names[variable] }}: valor típico</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th class="num">G1</th><th>Direção</th><th>Intensidade</th>
+          <th class="num">Média</th><th class="num">Mediana</th><th class="num">Média − mediana</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for team in measures.columns %}
+        {% set g = skew.loc[variable, team] %}
+        <tr>
+          <td><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</td>
+          <td class="num">{{ number(g) }}</td>
+          <td>{{ direction(g) }}</td>
+          <td>{{ intensity(g) }}</td>
+          <td class="num">{{ number(measures.loc["media", team]) }}</td>
+          <td class="num">{{ number(measures.loc["mediana", team]) }}</td>
+          <td class="num">{{ number(measures.loc["media", team] - measures.loc["mediana", team]) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Histograma com curva de densidade (KDE)</h3>
+  <p>
+    As barras mostram quantos jogos caíram em cada faixa de valores; a curva (KDE) é uma versão suavizada do
+    histograma. As linhas verticais marcam a média e a mediana: numa cauda longa à direita a média tende a ficar à
+    direita da mediana, e o contrário à esquerda.
+  </p>
+  <div class="chart">{{ hist | safe }}</div>
+
+  <h3>Boxplot</h3>
+  <p>
+    O mesmo boxplot da página <a href="/descritiva">Descritiva</a>. Na assimetria à direita, o bigode e os outliers de
+    cima ficam mais longos; à esquerda, os de baixo.
+  </p>
+  <div class="chart">{{ box | safe }}</div>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>O que os resultados mostram</h2>
+  <ul>
+    <li>
+      <strong>Na liga, as 7 variáveis são positivas, e tocos é a mais assimétrica.</strong> Os coeficientes vão de 0,05
+      (pontos, praticamente simétrico) a 0,58 (tocos, a única moderada), seguidos de roubos de bola (0,40). O motivo é
+      o limite do zero: tocos (média de 4,85 por jogo) e roubos de bola são contagens pequenas, que não podem ficar
+      abaixo de 0 mas podem passar de 10 numa noite rara, então a cauda só tem espaço para crescer para a direita. O
+      padrão se repete entre os times: tocos tem assimetria moderada ou forte em 15 dos 30 times, roubos de bola em 9 e
+      pontos em só 1. O único caso forte da liga é tocos do Orlando Magic (1,21).
+    </li>
+    <li>
+      <strong>Cleveland Cavaliers:</strong> as 7 variáveis têm coeficiente positivo e todas ficam na faixa
+      aproximadamente simétrica; a maior é roubos de bola (0,42). O CLE segue o padrão da liga, e a média e a mediana
+      quase coincidem: a maior diferença é em pontos (119,39 contra 118,00, só 1,39 ponto).
+    </li>
+    <li>
+      <strong>New York Knicks:</strong> o padrão é misto, com 4 variáveis negativas, e há duas moderadas. A mais forte é
+      <strong>rebotes, −0,77, à esquerda</strong>: o boxplot do próprio time tem 3 outliers por baixo (24, 29 e 30
+      rebotes) e 1 por cima (61), e o histograma mostra a cauda esquerda mais longa. Os dois gráficos e o coeficiente
+      contam a mesma história. Só o jogo de 24 rebotes (NYK @ CHA, 26/03/2026, também marcado na página
+      <a href="/outliers">Outliers</a>) pesa muito: sem ele o coeficiente cai para −0,49 e a variável passa a
+      aproximadamente simétrica. A outra moderada é tocos (0,52, à direita), puxada pelo jogo de 10 tocos contra o DAL
+      (19/11/2025); sem ele, 0,29.
+    </li>
+    <li>
+      <strong>Cautela com amostras pequenas.</strong> Com cerca de 75 jogos, o erro padrão do coeficiente é de
+      aproximadamente 0,28, então valores com |G1| abaixo de ~0,56 não se distinguem de zero com confiança de 95%. Entre
+      os dois times principais, só rebotes do NYK passa desse limite. O cubo da fórmula torna o coeficiente muito
+      sensível a um único jogo extremo: a média de rebotes do NYK (45,91) quase não muda em relação à mediana (46), mas
+      o coeficiente muda bastante com ou sem o jogo de 24 rebotes.
+    </li>
+    <li>
+      <strong>Quando os gráficos podem divergir do coeficiente.</strong> O histograma depende da largura das faixas, e a
+      KDE suaviza os dados e “vaza” um pouco além do mínimo e do máximo reais. Em contagens inteiras, a regra
+      “média maior que a mediana indica assimetria à direita” também falha: nas faltas do NYK o coeficiente é 0,10
+      (levemente à direita), mas a média (20,13) fica <em>abaixo</em> da mediana (21), porque a mediana só pode ser um
+      número inteiro ou meio.
+    </li>
+    <li>
+      <strong>Média ou mediana?</strong> Para CLE e NYK as duas medidas ficam a menos de 1 unidade uma da outra em quase
+      todas as variáveis; a exceção é pontos do CLE (1,39 ponto, pouco perto de ~119 por jogo). Então ambas representam
+      bem o valor típico. Em rebotes do NYK a <strong>mediana</strong> é a escolha
+      mais segura, porque não é afetada pelos jogos de 24, 29 e 30 rebotes.
+    </li>
+    <li>
+      <strong>Transformações ou métodos robustos?</strong> Uma transformação logarítmica não é recomendada: ela é útil
+      para assimetrias fortes à direita, e nenhuma variável de CLE ou NYK é forte. Testando log(1 + x) em tocos do NYK,
+      o coeficiente vai de 0,52 para −0,64: a transformação corrige demais e inverte a assimetria. Para as próximas
+      análises, bastam medidas robustas (mediana e IQR, na página <a href="/iqr">IQR</a>), que não dependem da forma da
+      distribuição.
+    </li>
+  </ul>
+</section>
+{% endblock %}

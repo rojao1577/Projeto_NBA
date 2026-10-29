@@ -1,20 +1,21 @@
 import pandas as pd
 from flask import Flask, abort, render_template, request
 
-from analysis.charts import VARIABLE_NAMES, boxplot, mean_bars, team_color, zscore_bars
+from analysis.charts import (VARIABLE_NAMES, boxplot, histogram_kde, mean_bars, method_heatmap, method_strip,
+                             team_color, votes_bars, zscore_bars)
 from analysis.cleaning import clean, convert_dates, derive_matchups, rename_columns
 from analysis.descriptive import compare_teams, outlier_games, team_table
-from analysis.formatting import format_measures
+from analysis.formatting import format_measures, number
+from analysis import outliers as od
 from analysis.loader import load_raw
-from analysis.quality import (DOMAIN, ZERO_MEANING, duplicates, inconsistency_checks, missing_counts,
-                              out_of_domain, special_values, validate_percentages)
+from analysis.quality import (DOMAIN, ZERO_MEANING, duplicates, inconsistencies_by_column, inconsistency_checks,
+                              missing_counts, out_of_domain, special_values, validate_percentages)
+from analysis.shape import MODERATE, STRONG, direction, intensity, skew_table
 from config import GROUP_TEAMS, VARIABLES
 
 PENDING_SECTIONS = {
     "dados": "Dados",
     "tratamento": "Tratamento",
-    "outliers": "Outliers",
-    "assimetria": "Assimetria",
     "cv": "Coeficiente de variação",
     "iqr": "Intervalo interquartil",
     "sintese": "Síntese",
@@ -47,12 +48,32 @@ def outliers_elsewhere(df, team: str, variable: str) -> list[str]:
     return [f"{VARIABLE_NAMES[col]} ({n})" for col, n in counts.items() if n > 0 and col != variable]
 
 
+LEAGUE = "liga"
+OUTLIER_PARAMS = {
+    "z": od.Z_THRESHOLD, "iqr_k": od.IQR_K, "grubbs_alpha": od.GRUBBS_ALPHA,
+    "contamination": od.CONTAMINATION, "knn_k": od.KNN_NEIGHBORS, "lof_k": od.LOF_NEIGHBORS,
+    "eps": od.DBSCAN_EPS, "min_samples": 2 * len(VARIABLES),
+}
+
+
+def flagged_games(df, joint, rows, min_votes: int) -> list[dict]:
+    selected = rows & (joint["votos"] >= min_votes)
+    methods = joint.loc[selected, list(od.MULTIVARIATE_METHODS)]
+    games = df.loc[selected, ["data_jogo", "confronto", "minutos"] + VARIABLES].copy()
+    games["votos"] = joint.loc[selected, "votos"]
+    games["metodos"] = [", ".join(methods.columns[row]) for row in methods.to_numpy()]
+    return games.sort_values(["votos", "data_jogo"], ascending=[False, True]).to_dict("records")
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     raw = load_raw()
     df = clean(raw)
     before_fix = derive_matchups(rename_columns(convert_dates(raw)))
     teams = team_options(df)
+    column_flags = od.all_column_flags(df, VARIABLES)
+    joint = od.joint_flags(df, VARIABLES)
+    inconsistent = inconsistencies_by_column(inconsistency_checks(df)).reindex(VARIABLES, fill_value=0)
 
     @app.route("/")
     def index():
@@ -104,6 +125,51 @@ def create_app() -> Flask:
             domain=domain, validation=validation,
             missing=missing, missing_total=int(missing.sum()),
             checks=inconsistency_checks(df),
+        )
+
+    @app.route("/outliers")
+    def outliers():
+        scope = choose(request.args.get("escopo"), [LEAGUE] + teams, LEAGUE)
+        variable = choose(request.args.get("variavel"), VARIABLES, VARIABLES[0])
+        rows = df["time"].notna() if scope == LEAGUE else df["time"] == scope
+        scope_name = "liga inteira (30 times)" if scope == LEAGUE else scope
+
+        counts = od.counts_from_flags(column_flags, rows)
+        table = counts.assign(inconsistencias=inconsistent).rename(index=VARIABLE_NAMES)
+        heatmap = method_heatmap(counts, scope_name).to_html(full_html=False, include_plotlyjs="cdn")
+        strip = method_strip(df, column_flags[variable], variable, rows, scope_name).to_html(
+            full_html=False, include_plotlyjs=False)
+        votes = votes_bars(joint.loc[rows, "votos"], scope_name).to_html(full_html=False, include_plotlyjs=False)
+        min_votes = 4 if scope == LEAGUE else 1
+
+        return render_template(
+            "outliers.html",
+            teams=teams, scope=scope, scope_name=scope_name, league=LEAGUE, variable=variable,
+            variable_names=VARIABLE_NAMES, rows=int(rows.sum()), params=OUTLIER_PARAMS,
+            table=table, heatmap=heatmap, strip=strip, votes=votes,
+            marked=int((joint.loc[rows, "votos"] > 0).sum()),
+            games=flagged_games(df, joint, rows, min_votes), min_votes=min_votes,
+        )
+
+    @app.route("/assimetria")
+    def assimetria():
+        team_a = choose(request.args.get("time_a"), teams, GROUP_TEAMS[0])
+        team_b = choose(request.args.get("time_b"), teams, GROUP_TEAMS[1])
+        variable = choose(request.args.get("variavel"), VARIABLES, VARIABLES[0])
+        selected = [team_a] if team_a == team_b else [team_a, team_b]
+
+        hist = histogram_kde(df, selected, variable).to_html(full_html=False, include_plotlyjs="cdn")
+        box = boxplot(df, selected, variable).to_html(full_html=False, include_plotlyjs=False)
+        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
+
+        return render_template(
+            "assimetria.html",
+            teams=teams, team_a=team_a, team_b=team_b, variable=variable,
+            variable_names=VARIABLE_NAMES, colors=colors,
+            skew=skew_table(df, selected, VARIABLES), league=df[VARIABLES].skew(),
+            measures=compare_teams(df, selected, variable), hist=hist, box=box,
+            direction=direction, intensity=intensity, number=number,
+            moderate=MODERATE, strong=STRONG,
         )
 
     @app.route("/<section>")

@@ -263,6 +263,9 @@ code {
 .team-dot.cle { background: var(--cle); }
 .team-dot.nyk { background: var(--nyk); }
 
+/* classificação abaixo do número numa célula (ex.: assimetria) */
+.cell-note { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+
 /* ---------- rodapé ---------- */
 .site-footer {
   max-width: 1080px;

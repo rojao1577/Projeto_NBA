@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Outliers{% endblock %}
+
+{% block content %}
+<h1>Outliers</h1>
+<p class="lead">
+  Um outlier é um valor muito diferente da maioria. Ele pode ser um erro (digitação, conversão) ou um evento real, mas raro.
+  Aplicamos os 7 métodos pedidos a cada uma das 7 variáveis e contamos, por coluna, quantos jogos cada método marcou.
+  Os métodos rodam sempre na <strong>liga inteira</strong> (2238 linhas). Ao escolher um time, a página mostra quantos
+  desses outliers da liga são jogos daquele time.
+</p>
+
+<section class="card">
+  <form class="filters" method="get" action="/outliers">
+    <label>Recorte
+      <select name="escopo">
+        <option value="{{ league }}" {% if scope == league %}selected{% endif %}>Liga inteira (30 times)</option>
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == scope %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Variável (gráfico por método)
+      <select name="variavel">
+        {% for col, name in variable_names.items() %}
+        <option value="{{ col }}" {% if col == variable %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Ver</button>
+  </form>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>1. Quantidade de outliers e de inconsistências por coluna — {{ scope_name }}</h2>
+  <p>
+    Cada célula é o número de jogos ({{ rows }} no recorte) que o método marcou naquela coluna, analisando a coluna
+    sozinha. A última coluna repete o resultado das 11 regras de inconsistência da página
+    <a href="/qualidade">Qualidade</a>.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th>
+          {% for method in table.columns[:-1] %}<th class="num">{{ method }}</th>{% endfor %}
+          <th class="num">Inconsistências</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, row in table.iterrows() %}
+        <tr>
+          <td>{{ name }}</td>
+          {% for value in row %}<td class="num">{{ value }}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Contagens de jogos (linhas time × jogo). Inconsistências = regras violadas que envolvem a coluna, calculadas na
+    liga: como nenhuma das 11 regras foi violada, o valor é 0 em qualquer recorte.
+  </p>
+  <div class="chart">{{ heatmap | safe }}</div>
+
+  <h3>Onde cada método cortou</h3>
+  <p>
+    A primeira linha resume todos os jogos do recorte (caixa de Q1 a Q3); as linhas de baixo mostram só os jogos que
+    cada método marcou. Passe o mouse num ponto para ver o jogo.
+  </p>
+  <div class="chart">{{ strip | safe }}</div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>2. Comparação entre os métodos: as 7 variáveis juntas</h2>
+  <p>
+    Os 4 métodos multivariados (ECOD, K-NN, LOF e DBSCAN) também foram aplicados às 7 variáveis ao mesmo tempo:
+    assim eles procuram jogos com uma <em>combinação</em> rara (por exemplo, muitos pontos e muitos rebotes no mesmo
+    jogo). Cada jogo recebe um voto por método que o marcou. No recorte, <strong>{{ marked }}</strong> jogos tiveram
+    pelo menos um voto.
+  </p>
+  {% if marked %}
+  <div class="chart">{{ votes | safe }}</div>
+  {% endif %}
+
+  <h3>
+    {% if min_votes == 4 %}Jogos marcados pelos 4 métodos{% else %}Jogos do time marcados por pelo menos 1 método{% endif %}
+  </h3>
+  {% if games %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th><th>Confronto</th><th class="num">Minutos</th>
+          {% for col, name in variable_names.items() %}<th class="num">{{ name }}</th>{% endfor %}
+          <th class="num">Votos</th><th>Métodos</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for game in games %}
+        <tr>
+          <td>{{ game.data_jogo.strftime("%d/%m/%Y") }}</td>
+          <td>{{ game.confronto }}</td>
+          <td class="num">{{ game.minutos }}</td>
+          {% for col in variable_names %}<td class="num">{{ game[col] }}</td>{% endfor %}
+          <td class="num">{{ game.votos }}</td>
+          <td>{{ game.metodos }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Minutos: 240 = tempo normal; 265 = 1 prorrogação; 290 = 2 prorrogações.</p>
+  {% else %}
+  <p class="muted">
+    Nenhum jogo de {{ scope_name }} foi marcado por qualquer um dos 4 métodos multivariados: a combinação das 7
+    variáveis em todos os jogos do time está dentro do padrão da liga.
+  </p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <span class="card-label">Teoria</span>
+  <h2>3. Os 7 métodos: como funcionam e como foram configurados</h2>
+
+  <h3>Z-score</h3>
+  <p>
+    Mede a quantos desvios padrão o valor está da média: <strong>z = (x − média) ÷ desvio padrão</strong> (amostral,
+    n − 1). Um jogo é outlier quando <strong>|z| &gt; {{ params.z }}</strong>. A justificativa vem da distribuição
+    normal, em que só 0,3% dos valores passam de 3 desvios. Limitação: a média e o desvio são puxados pelos próprios
+    outliers, e a regra pressupõe uma distribuição aproximadamente normal.
+  </p>
+
+  <h3>IQR / Boxplot</h3>
+  <p>
+    Usa os quartis, que não são afetados pelos extremos: IQR = Q3 − Q1 (quartis por interpolação linear). São outliers
+    os valores abaixo de <strong>Q1 − {{ params.iqr_k | string | replace(".", ",") }} × IQR</strong> ou acima de
+    <strong>Q3 + {{ params.iqr_k | string | replace(".", ",") }} × IQR</strong>, os mesmos limites do boxplot da página
+    <a href="/descritiva">Descritiva</a>. É robusto e não exige normalidade, mas em variáveis discretas e com faixa
+    central estreita (como tocos) ele marca muitos jogos.
+  </p>
+
+  <h3>Teste de Grubbs</h3>
+  <p>
+    Teste de hipótese para o valor mais distante da média. H0: não há outlier; a estatística é
+    <strong>G = max |x − média| ÷ desvio padrão</strong>, comparada a um valor crítico da distribuição t de Student
+    (nível de significância α = {{ params.grubbs_alpha | string | replace(".", ",") }}). Se G passar do crítico, o valor
+    é removido e o teste é repetido (versão iterativa), até nenhum valor ser significativo. Pressupõe dados normais e
+    fica mais exigente com n grande: com os 2238 jogos da liga, o crítico é cerca de 4,23 desvios, mais rígido que o
+    corte de 3 do Z-score.
+  </p>
+
+  <h3>ECOD (Empirical Cumulative Distribution-based Outlier Detection)</h3>
+  <p>
+    Para cada variável, estima a distribuição acumulada empírica (a proporção de jogos abaixo de cada valor) e calcula
+    a probabilidade de cair tão longe quanto o jogo caiu, em cada cauda. As probabilidades das variáveis são somadas em
+    escala logarítmica, formando um escore: quanto menor a probabilidade, maior o escore. Não tem parâmetros de distância
+    nem pressupõe normalidade. Os {{ (params.contamination * 100) | int }}% de escores mais altos são marcados
+    (<em>contaminação</em> = {{ params.contamination | string | replace(".", ",") }}).
+  </p>
+
+  <h3>K-NN (K-Nearest Neighbors) para anomalias</h3>
+  <p>
+    O escore de cada jogo é a distância até o seu {{ params.knn_k }}º vizinho mais próximo: um jogo isolado tem vizinhos
+    distantes. As variáveis são padronizadas por z-score antes, para que pontos (por volta de 115) não dominem tocos
+    (por volta de 5) na distância. Também marca a fração de contaminação ({{ (params.contamination * 100) | int }}%).
+  </p>
+
+  <h3>DBSCAN (Density-Based Spatial Clustering of Applications with Noise)</h3>
+  <p>
+    Algoritmo de agrupamento por densidade: um ponto é “central” se tem pelo menos <em>min_samples</em> vizinhos num raio
+    <em>eps</em>; grupos são formados ligando pontos centrais, e quem não pertence a nenhum grupo é <strong>ruído</strong>,
+    que é o outlier. Diferente dos anteriores, não fixa uma porcentagem. Usamos dados padronizados,
+    eps = {{ params.eps | string | replace(".", ",") }} (escolhido pelo “cotovelo” do gráfico de distâncias ao k-ésimo
+    vizinho) e min_samples = {{ params.min_samples }} (2 × o número de variáveis, regra usual).
+  </p>
+
+  <h3>LOF (Local Outlier Factor)</h3>
+  <p>
+    Compara a densidade em volta de um jogo com a densidade em volta dos seus {{ params.lof_k }} vizinhos. LOF ≈ 1 quer
+    dizer densidade parecida com a dos vizinhos; LOF bem maior que 1 quer dizer que o jogo está numa região mais vazia
+    que a dos vizinhos. Por ser <em>local</em>, encontra pontos isolados mesmo em regiões de densidades diferentes. Dados
+    padronizados e contaminação de {{ (params.contamination * 100) | int }}%.
+  </p>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>O que os resultados mostram</h2>
+  <ul>
+    <li>
+      <strong>Os métodos não concordam, e isso é esperado: cada um mede uma coisa diferente.</strong> Na liga, o IQR é o
+      que mais marca (de 13 a 51 jogos por coluna), e o Grubbs, o que menos marca (só 1 jogo, em assistências). Com
+      2238 jogos o crítico do Grubbs fica em ~4,23 desvios, e quase nenhum jogo fica tão longe da média: as
+      assimetrias ficam entre 0,05 (pontos) e 0,58 (tocos), sem caudas longas.
+    </li>
+    <li>
+      <strong>Em ECOD, K-NN e LOF, a quantidade marcada é uma escolha nossa, não uma descoberta.</strong> A contaminação
+      de 1% manda marcar cerca de 22 dos 2238 jogos, e é por isso que esses métodos ficam perto de 22 em quase toda
+      coluna. Os desvios dessa conta vêm dos empates: as variáveis são contagens inteiras e muitos jogos têm o mesmo
+      valor (250 jogos com 13 cestas de 3). No K-NN, jogos empatados ficam a distância zero uns dos outros, e em cestas
+      de 3 só 2 jogos passaram do corte.
+    </li>
+    <li>
+      <strong>O DBSCAN dá 0 em todas as colunas analisadas sozinhas.</strong> O eps = 2,0 foi calibrado para as 7
+      variáveis juntas; numa variável só, 2 desvios padrão é um raio enorme, e todos os jogos acabam num único grupo
+      denso. Ele só funciona na análise conjunta (seção 2), onde marca 30 jogos.
+    </li>
+    <li>
+      <strong>Tocos é a coluna com mais outliers pelo IQR (51).</strong> Na liga, Q1 = 3 e Q3 = 6, então IQR = 3 e o
+      limite superior é 10,5: todo jogo com 11 tocos ou mais é marcado. É também a variável mais assimétrica à direita
+      (0,58), o que será discutido em <a href="/assimetria">Assimetria</a>.
+    </li>
+    <li>
+      <strong>Os outliers são jogos reais, não erros.</strong> Os 8 jogos marcados pelos 4 métodos têm valores possíveis
+      e coerentes entre si (todas as 11 regras de inconsistência deram 0), e a prorrogação explica parte deles: 2 dos 8
+      tiveram 290 minutos, e entre os jogos com pelo menos um voto 17% foram para a prorrogação, contra 4,6% na liga.
+      Mais tempo de jogo gera mais pontos, rebotes e faltas. Por isso <strong>nenhum outlier foi removido</strong>: eles
+      fazem parte da temporada, e o efeito deles é tratado com medidas robustas (mediana, IQR) nas outras seções.
+    </li>
+    <li>
+      <strong>Cleveland Cavaliers:</strong> nenhum jogo do CLE foi marcado nas 7 variáveis juntas. Coluna a coluna,
+      aparecem poucos casos isolados, como os 149 pontos contra o MIA em 27/03/2026 (só o ECOD) e os 17 roubos de bola
+      contra o LAC em 04/02/2026 (IQR e LOF). Nenhum vem de prorrogação: são noites excepcionais, e não um time
+      irregular.
+    </li>
+    <li>
+      <strong>New York Knicks:</strong> também não tem jogos marcados na análise conjunta. Os casos mais fortes coluna a
+      coluna são as 44 assistências contra o DEN em 06/03/2026 (Z-score, IQR, ECOD e K-NN) e os só 24 rebotes contra o
+      CHA em 26/03/2026 (IQR, ECOD, K-NN e LOF), um outlier inferior num time que costuma ficar acima da liga em
+      rebotes. Os 80 pontos contra o DET em 06/02/2026 também aparecem (IQR e ECOD).
+    </li>
+    <li>
+      <strong>Diferença em relação à página Descritiva:</strong> lá o IQR é calculado dentro do próprio time (o boxplot
+      de cada time); aqui, na liga. Um jogo pode ser incomum para o time e normal para a NBA: o NYK tem 4 outliers de
+      rebotes pelos limites do próprio time, mas só 1 pelos limites da liga. Rodar os métodos só nos ~75 jogos de cada
+      time também não serviria: a contaminação de 1% obrigaria ECOD, K-NN e LOF a marcarem ~1 jogo por coluna em
+      qualquer time.
+    </li>
+  </ul>
+</section>
+{% endblock %}

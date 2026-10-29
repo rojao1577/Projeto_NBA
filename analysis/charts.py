@@ -1,5 +1,7 @@
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from scipy.stats import gaussian_kde
 from analysis.descriptive import describe, league_zscores
 from analysis.formatting import number
 
@@ -158,5 +160,114 @@ def zscore_bars(df, teams, columns):
         yaxis=dict(autorange="reversed"),
         barmode="group", template="plotly_white", height=560, separators=",.",
         legend=dict(orientation="h", y=-0.18),
+    )
+    return fig
+
+
+SEQUENTIAL_BLUES = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
+
+
+def method_heatmap(counts, scope):
+    names = [VARIABLE_NAMES[col] for col in counts.index]
+    methods = counts.columns.tolist()
+    hover = [[f"{name} · {method}: {counts.loc[col, method]} jogos marcados"
+              for method in methods] for col, name in zip(counts.index, names)]
+    fig = go.Figure(go.Heatmap(
+        z=counts.values, x=methods, y=names, colorscale=SEQUENTIAL_BLUES, zmin=0,
+        text=counts.values, texttemplate="%{text}", hovertext=hover, hoverinfo="text",
+        xgap=2, ygap=2, colorbar=dict(title="Jogos<br>marcados", tickformat="d",
+                                      dtick=1 if counts.values.max() <= 5 else None),
+    ))
+    fig.update_layout(
+        title=f"Outliers por coluna e por método — {scope}",
+        xaxis=dict(title="Método de detecção", side="bottom"),
+        yaxis=dict(title="Variável (cada uma analisada sozinha)", autorange="reversed"),
+        template="plotly_white", height=480, separators=",.",
+    )
+    return fig
+
+
+def votes_bars(votes, scope):
+    counts = votes.value_counts().reindex(range(1, 5), fill_value=0)
+    fig = go.Figure(go.Bar(
+        x=counts.index, y=counts.values, marker=dict(color=OUTLIER_COLOR, cornerradius=4),
+        text=counts.values, textposition="outside",
+        hovertext=[f"{n} jogos marcados por {v} dos 4 métodos" for v, n in counts.items()],
+        hoverinfo="text",
+    ))
+    fig.update_layout(
+        title=f"Em quantos métodos multivariados cada jogo foi outlier — {scope}<br>"
+              f"<sup>{int((votes == 0).sum())} jogos não foram marcados por nenhum método (não aparecem no gráfico)</sup>",
+        xaxis=dict(title="Número de métodos que marcaram o jogo (ECOD, K-NN, LOF, DBSCAN)", tickvals=[1, 2, 3, 4]),
+        yaxis=dict(title="Quantidade de jogos", rangemode="tozero"),
+        template="plotly_white", height=460, separators=",.", bargap=0.4,
+    )
+    return fig
+
+
+def method_strip(df, flags, col, rows, scope):
+    name = VARIABLE_NAMES[col]
+    games = df[rows]
+    fig = go.Figure(go.Box(
+        x=games[col], y=["Todos os jogos"] * len(games), orientation="h", name="Todos os jogos",
+        marker_color=OTHER_COLOR, boxpoints=False, hoverinfo="skip",
+    ))
+    legend_shown = False
+    for method in reversed(flags.columns):
+        marked = games[flags.loc[rows, method]]
+        show_legend = len(marked) > 0 and not legend_shown
+        legend_shown |= show_legend
+        fig.add_trace(go.Scatter(
+            x=marked[col], y=[method] * len(marked), mode="markers", name="Jogo marcado",
+            legendgroup="marcado", showlegend=show_legend,
+            marker=dict(color=OUTLIER_COLOR, size=10, symbol="circle-open", line=dict(width=2)),
+            hovertext=[f"{method}: {v}<br>{t}<br>{d:%d/%m/%Y} · {c} · {m} min"
+                       for v, t, d, c, m in zip(marked[col], marked["time"], marked["data_jogo"],
+                                                marked["confronto"], marked["minutos"])],
+            hoverinfo="text",
+        ))
+    fig.update_layout(
+        title=f"Quais valores de {name} cada método marcou — {scope}",
+        xaxis_title=f"{name} (quantidade por jogo)",
+        yaxis=dict(title="Método", categoryorder="array",
+                   categoryarray=list(reversed(flags.columns)) + ["Todos os jogos"]),
+        template="plotly_white", height=520, separators=",.",
+        legend=dict(orientation="h", y=-0.18),
+    )
+    return fig
+
+
+def histogram_kde(df, teams, col):
+    name = VARIABLE_NAMES[col]
+    fig = make_subplots(rows=1, cols=len(teams), subplot_titles=teams, shared_yaxes=True)
+    for i, team in enumerate(teams):
+        s = df[df["time"] == team][col]
+        color = team_color(team, i)
+        q1, q3 = s.quantile([0.25, 0.75])
+        width = max(1, round(2 * (q3 - q1) / len(s) ** (1 / 3)))
+        fig.add_trace(go.Histogram(
+            x=s, histnorm="probability density", name="Histograma", legendgroup="hist", showlegend=i == 0,
+            xbins=dict(start=s.min() - 0.5, end=s.max() + 0.5, size=width),
+            marker=dict(color=_transparent(color, 0.45), line=dict(color=color, width=1)),
+            hovertemplate=f"{team}<br>{name}: %{{x}}<br>Densidade: %{{y:.3f}}<extra></extra>",
+        ), row=1, col=i + 1)
+        grid = np.linspace(s.min() - width, s.max() + width, 200)
+        fig.add_trace(go.Scatter(
+            x=grid, y=gaussian_kde(s)(grid), mode="lines", name="Curva de densidade (KDE)",
+            legendgroup="kde", showlegend=i == 0, line=dict(color=INK, width=2), hoverinfo="skip",
+        ), row=1, col=i + 1)
+        fig.add_vline(x=s.mean(), line=dict(color=INK, dash="dash", width=1.5), row=1, col=i + 1)
+        fig.add_vline(x=s.median(), line=dict(color=INK, dash="dot", width=1.5), row=1, col=i + 1)
+        fig.update_xaxes(title_text=f"{name} (quantidade por jogo)", row=1, col=i + 1)
+
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Média",
+                             line=dict(color=INK, dash="dash", width=1.5)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Mediana",
+                             line=dict(color=INK, dash="dot", width=1.5)), row=1, col=1)
+    fig.update_yaxes(title_text="Densidade (proporção de jogos ÷ largura da faixa)", row=1, col=1)
+    fig.update_layout(
+        title=f"Histograma e curva de densidade — {name} por jogo",
+        template="plotly_white", height=480, separators=",.", bargap=0.05,
+        legend=dict(orientation="h", y=-0.22),
     )
     return fig

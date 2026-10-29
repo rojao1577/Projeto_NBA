@@ -93,8 +93,16 @@ def column_flags(df: pd.DataFrame, col: str) -> pd.DataFrame:
     return pd.DataFrame(flags)
 
 
+def all_column_flags(df: pd.DataFrame, columns: list[str]) -> dict[str, pd.DataFrame]:
+    return {col: column_flags(df, col) for col in columns}
+
+
+def counts_from_flags(flags: dict[str, pd.DataFrame], rows: pd.Series | None = None) -> pd.DataFrame:
+    return pd.DataFrame({col: (f if rows is None else f[rows]).sum() for col, f in flags.items()}).T
+
+
 def outlier_counts(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    return pd.DataFrame({col: column_flags(df, col).sum() for col in columns}).T
+    return counts_from_flags(all_column_flags(df, columns))
 
 
 def joint_flags(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
