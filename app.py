@@ -2,7 +2,7 @@ import pandas as pd
 from flask import Flask, abort, render_template, request
 
 from analysis.charts import (VARIABLE_NAMES, boxplot, cv_bars, histogram_kde, mean_bars, method_heatmap,
-                             method_strip, team_color, votes_bars, zscore_bars)
+                             method_strip, team_dot, team_palette, votes_bars, zscore_bars)
 from analysis.cleaning import clean, convert_dates, derive_matchups, rename_columns
 from analysis.descriptive import compare_teams, outlier_games, team_table
 from analysis.formatting import format_measures, number
@@ -91,7 +91,7 @@ def create_app() -> Flask:
         chart = boxplot(df, selected, variable).to_html(full_html=False, include_plotlyjs="cdn")
         means_chart = mean_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs=False)
         z_chart = zscore_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs=False)
-        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
+        colors = {team: team_dot(c) for team, c in team_palette(selected).items()}
         outliers = {team: outlier_games(df, team, variable).to_dict("records") for team in selected}
         elsewhere = {team: outliers_elsewhere(df, team, variable) for team in selected}
 
@@ -161,7 +161,7 @@ def create_app() -> Flask:
 
         hist = histogram_kde(df, selected, variable).to_html(full_html=False, include_plotlyjs="cdn")
         box = boxplot(df, selected, variable).to_html(full_html=False, include_plotlyjs=False)
-        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
+        colors = {team: team_dot(c) for team, c in team_palette(selected).items()}
 
         return render_template(
             "assimetria.html",
@@ -180,7 +180,7 @@ def create_app() -> Flask:
         selected = [team_a] if team_a == team_b else [team_a, team_b]
 
         chart = cv_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs="cdn")
-        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
+        colors = {team: team_dot(c) for team, c in team_palette(selected).items()}
 
         return render_template(
             "cv.html",

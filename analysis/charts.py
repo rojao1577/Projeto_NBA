@@ -15,9 +15,40 @@ VARIABLE_NAMES = {
     "faltas": "Faltas",
     "cestas_3_convertidas": "Cestas de 3 convertidas",
 }
-TEAM_COLORS = {"Cleveland Cavaliers": "#a3123a", "New York Knicks": "#eb6834"}
-OTHER_COLOR = "#8a8984"
-OTHER_COLORS = [OTHER_COLOR, "#1baf7a"]
+# cores oficiais (principal, secundária) — fonte: teamcolorcodes.com
+TEAM_COLORS = {
+    "Atlanta Hawks": ("#E03A3E", "#C1D32F"),
+    "Boston Celtics": ("#007A33", "#BA9653"),
+    "Brooklyn Nets": ("#000000", "#FFFFFF"),
+    "Charlotte Hornets": ("#1D1160", "#00788C"),
+    "Chicago Bulls": ("#CE1141", "#000000"),
+    "Cleveland Cavaliers": ("#860038", "#041E42"),
+    "Dallas Mavericks": ("#00538C", "#002B5E"),
+    "Denver Nuggets": ("#0E2240", "#FEC524"),
+    "Detroit Pistons": ("#C8102E", "#1D42BA"),
+    "Golden State Warriors": ("#1D428A", "#FFC72C"),
+    "Houston Rockets": ("#CE1141", "#000000"),
+    "Indiana Pacers": ("#002D62", "#FDBB30"),
+    "Los Angeles Clippers": ("#C8102E", "#1D428A"),
+    "Los Angeles Lakers": ("#552583", "#FDB927"),
+    "Memphis Grizzlies": ("#5D76A9", "#12173F"),
+    "Miami Heat": ("#98002E", "#F9A01B"),
+    "Milwaukee Bucks": ("#00471B", "#EEE1C6"),
+    "Minnesota Timberwolves": ("#0C2340", "#236192"),
+    "New Orleans Pelicans": ("#0C2340", "#C8102E"),
+    "New York Knicks": ("#006BB6", "#F58426"),
+    "Oklahoma City Thunder": ("#007AC1", "#EF3B24"),
+    "Orlando Magic": ("#0077C0", "#C4CED4"),
+    "Philadelphia 76ers": ("#006BB6", "#ED174C"),
+    "Phoenix Suns": ("#1D1160", "#E56020"),
+    "Portland Trail Blazers": ("#E03A3E", "#000000"),
+    "Sacramento Kings": ("#5A2D81", "#63727A"),
+    "San Antonio Spurs": ("#C4CED4", "#000000"),
+    "Toronto Raptors": ("#CE1141", "#000000"),
+    "Utah Jazz": ("#002B5C", "#00471B"),
+    "Washington Wizards": ("#002B5C", "#E31837"),
+}
+MIN_COLOR_DISTANCE = 15
 INK = "#3a3936"
 OUTLIER_COLOR = "#6250d6"
 BOX_WIDTH = 0.5
@@ -28,8 +59,44 @@ def _transparent(hex_color: str, alpha: float = 0.3) -> str:
     return f"rgba({r}, {g}, {b}, {alpha})"
 
 
-def team_color(team: str, position: int) -> str:
-    return TEAM_COLORS.get(team, OTHER_COLORS[position % len(OTHER_COLORS)])
+def _oklab(hex_color: str) -> tuple[float, float, float]:
+    rgb = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    r, g, b = (c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb)
+    l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return (0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+            1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+            0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s)
+
+
+def color_distance(a: str, b: str) -> float:
+    return 100 * float(np.linalg.norm(np.subtract(_oklab(a), _oklab(b))))
+
+
+def team_palette(teams: list[str]) -> dict[str, tuple[str, str]]:
+    palette = {}
+    for team in teams:
+        main, stripe = TEAM_COLORS[team]
+        if any(color_distance(main, used) < MIN_COLOR_DISTANCE for used, _ in palette.values()):
+            main, stripe = stripe, main
+        palette[team] = (main, stripe)
+    return palette
+
+
+def team_marker(colors: tuple[str, str]) -> dict:
+    main, stripe = colors
+    return dict(color=main, cornerradius=4, line=dict(color=stripe, width=1),
+                pattern=dict(shape="/", fgcolor=stripe, size=10, solidity=0.3, fillmode="overlay"))
+
+
+def darker(colors: tuple[str, str]) -> str:
+    return min(colors, key=lambda color: _oklab(color)[0])
+
+
+def team_dot(colors: tuple[str, str]) -> str:
+    main, stripe = colors
+    return f"linear-gradient(135deg, {main} 50%, {stripe} 50%)"
 
 
 def _first_time(fig: go.Figure, name: str) -> bool:
@@ -56,19 +123,20 @@ def _add_points(fig, x, values, name, symbol, size, color, hover):
 def boxplot(df, teams, col):
     name = VARIABLE_NAMES[col]
     fig = go.Figure()
+    palette = team_palette(teams)
     for x, team in enumerate(teams):
         team_games = df[df["time"] == team]
         s = team_games[col]
         stats = describe(s)
         low, high = stats["limite_inferior"], stats["limite_superior"]
         inside = s[(s >= low) & (s <= high)]
-        color = team_color(team, x)
+        main, edge = palette[team][0], darker(palette[team])
 
         fig.add_trace(go.Box(
             x=[x], q1=[stats["q1"]], median=[stats["mediana"]], q3=[stats["q3"]],
             lowerfence=[inside.min()], upperfence=[inside.max()],
-            width=BOX_WIDTH, whiskerwidth=0.6, fillcolor=_transparent(color),
-            line=dict(color=color, width=2), name="Caixa: de Q1 a Q3",
+            width=BOX_WIDTH, whiskerwidth=0.6, fillcolor=_transparent(main, 0.5),
+            line=dict(color=edge, width=2), name="Caixa: de Q1 a Q3",
             legendgroup="caixa", showlegend=x == 0, hoverinfo="skip",
         ))
         fig.add_annotation(x=x + BOX_WIDTH / 2, y=stats["q3"], text=f"Q3 = {number(stats['q3'])}",
@@ -105,6 +173,7 @@ def boxplot(df, teams, col):
 def mean_bars(df, teams, columns):
     means = df.groupby("time")[columns].mean()
     league = means.mean()
+    palette = team_palette(teams)
     fig = make_subplots(rows=2, cols=4, subplot_titles=[VARIABLE_NAMES[col] for col in columns],
                         vertical_spacing=0.2, horizontal_spacing=0.07)
     for i, col in enumerate(columns):
@@ -113,7 +182,7 @@ def mean_bars(df, teams, columns):
             value = means.loc[team, col]
             fig.add_trace(go.Bar(
                 x=[team], y=[value], name=team, legendgroup=team, showlegend=i == 0,
-                marker=dict(color=team_color(team, position), cornerradius=4),
+                marker=team_marker(palette[team]),
                 hovertext=f"{team}<br>{VARIABLE_NAMES[col]}: {number(value)} por jogo<br>"
                           f"Média da liga: {number(league[col])}",
                 hoverinfo="text",
@@ -138,6 +207,7 @@ def zscore_bars(df, teams, columns):
     z = league_zscores(df, teams, columns)
     means = df.groupby("time")[columns].mean()
     ranks = means.rank(ascending=False).astype(int)
+    palette = team_palette(teams)
     names = [VARIABLE_NAMES[col] for col in columns]
     fig = go.Figure()
     for position, team in enumerate(teams):
@@ -147,7 +217,7 @@ def zscore_bars(df, teams, columns):
                  for col in columns]
         fig.add_trace(go.Bar(
             y=names, x=z.loc[team].tolist(), orientation="h", name=team,
-            marker=dict(color=team_color(team, position), cornerradius=4),
+            marker=team_marker(palette[team]),
             text=[number(v) for v in z.loc[team]], textposition="outside",
             hovertext=hover, hoverinfo="text",
         ))
@@ -211,7 +281,7 @@ def method_strip(df, flags, col, rows, scope):
     games = df[rows]
     fig = go.Figure(go.Box(
         x=games[col], y=["Todos os jogos"] * len(games), orientation="h", name="Todos os jogos",
-        marker_color=OTHER_COLOR, boxpoints=False, hoverinfo="skip",
+        marker_color="#8a8984", boxpoints=False, hoverinfo="skip",
     ))
     legend_shown = False
     for method in reversed(flags.columns):
@@ -241,15 +311,15 @@ def method_strip(df, flags, col, rows, scope):
 def histogram_kde(df, teams, col):
     name = VARIABLE_NAMES[col]
     fig = make_subplots(rows=1, cols=len(teams), subplot_titles=teams, shared_yaxes=True)
+    palette = team_palette(teams)
     for i, team in enumerate(teams):
         s = df[df["time"] == team][col]
-        color = team_color(team, i)
         q1, q3 = s.quantile([0.25, 0.75])
         width = max(1, round(2 * (q3 - q1) / len(s) ** (1 / 3)))
         fig.add_trace(go.Histogram(
             x=s, histnorm="probability density", name="Histograma", legendgroup="hist", showlegend=i == 0,
             xbins=dict(start=s.min() - 0.5, end=s.max() + 0.5, size=width),
-            marker=dict(color=_transparent(color, 0.45), line=dict(color=color, width=1)),
+            marker=team_marker(palette[team]), opacity=0.8,
             hovertemplate=f"{team}<br>{name}: %{{x}}<br>Densidade: %{{y:.3f}}<extra></extra>",
         ), row=1, col=i + 1)
         grid = np.linspace(s.min() - width, s.max() + width, 200)
@@ -279,20 +349,20 @@ def cv_bars(df, teams, columns):
     std = by_team(df, teams, columns, "std")
     cv = cv_table(df, teams, columns)
     expected = poisson_cv_table(df, teams, columns)
+    palette = team_palette(teams)
     fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.06,
                         subplot_titles=["Desvio padrão (na unidade de cada variável)",
                                         "Coeficiente de variação (%)"])
     for position, team in enumerate(teams):
-        color = team_color(team, position)
         fig.add_trace(go.Bar(
             y=names, x=std[team], orientation="h", name=team, legendgroup=team, offsetgroup=str(position),
-            marker=dict(color=color, cornerradius=4),
+            marker=team_marker(palette[team]),
             hovertext=[f"{team}<br>{n}: desvio {number(v)}" for n, v in zip(names, std[team])],
             hoverinfo="text",
         ), row=1, col=1)
         fig.add_trace(go.Bar(
             y=names, x=cv[team], orientation="h", name=team, legendgroup=team, showlegend=False,
-            offsetgroup=str(position), marker=dict(color=color, cornerradius=4),
+            offsetgroup=str(position), marker=team_marker(palette[team]),
             hovertext=[f"{team}<br>{n}: CV {number(v)}%<br>Esperado numa contagem de Poisson: {number(e)}%"
                        for n, v, e in zip(names, cv[team], expected[team])],
             hoverinfo="text",
@@ -302,7 +372,7 @@ def cv_bars(df, teams, columns):
         fig.add_trace(go.Scatter(
             y=names, x=expected[team], mode="markers", orientation="h", name="CV esperado só pelo tamanho da média (1 ÷ √média)",
             legendgroup="poisson", showlegend=position == 0, offsetgroup=str(position),
-            marker=dict(symbol="line-ns", size=14, line=dict(color=INK, width=3)),
+            marker=dict(symbol="diamond", size=10, color="#ffffff", line=dict(color=INK, width=2)),
             hovertext=[f"{team}<br>{n}: CV esperado {number(e)}%" for n, e in zip(names, expected[team])],
             hoverinfo="text",
         ), row=1, col=2)

@@ -259,6 +259,7 @@ code {
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: baseline;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);   /* contorno para cores claras (ex.: branco do Nets) */
 }
 .team-dot.cle { background: var(--cle); }
 .team-dot.nyk { background: var(--nyk); }
