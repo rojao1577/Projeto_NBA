@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Intervalo interquartil{% endblock %}
+
+{% block content %}
+<h1>Intervalo interquartil</h1>
+<p class="lead">
+  O intervalo interquartil (IQR) é a largura da faixa que contém os 50% centrais dos jogos. Por ignorar o quarto mais
+  baixo e o quarto mais alto, ele não é afetado pelos jogos extremos, e é a base da regra de outliers do boxplot.
+</p>
+
+<section class="card">
+  <form class="filters" method="get" action="/iqr">
+    <label>Time A
+      <select name="time_a">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_a %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Time B
+      <select name="time_b">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_b %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Variável (robustez e regra de outliers)
+      <select name="variavel">
+        {% for col, name in variable_names.items() %}
+        <option value="{{ col }}" {% if col == variable %}selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Ver</button>
+  </form>
+</section>
+
+<section class="card">
+  <span class="card-label">Método</span>
+  <h2>Fórmula e método dos quartis</h2>
+  <p>
+    <strong>IQR = Q3 − Q1</strong>, com os quartis calculados por <strong>interpolação linear</strong> (o padrão do
+    pandas e do NumPy, <code>quantile(0.25)</code> e <code>quantile(0.75)</code>): os jogos são ordenados, o quartil
+    fica na posição (n − 1) × 0,25 (ou × 0,75) e, quando essa posição cai entre dois jogos, toma-se o valor
+    proporcional entre eles. É o mesmo método da tabela da página <a href="/descritiva">Descritiva</a> e do boxplot, então
+    os três sempre concordam.
+  </p>
+  <p>
+    <strong>Exemplo:</strong> nos pontos do Cleveland Cavaliers, Q1 = 111,25 e Q3 = 129,00, então IQR = 17,75. Em
+    palavras: <em>metade dos jogos do CLE terminou com o time marcando entre 111,25 e 129 pontos, uma faixa de 17,75
+    pontos</em>. Um IQR pequeno quer dizer um time concentrado, que repete números parecidos; um IQR grande quer dizer
+    que mesmo os jogos “normais” variam bastante.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Q1, Q3 e IQR por variável e por time</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Variável</th>
+          {% for team in selected %}
+          <th colspan="3" class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for team in selected %}<th class="num">Q1</th><th class="num">Q3</th><th class="num">IQR</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          {% for team in selected %}
+          <td class="num">{{ number(q1.loc[col, team]) }}</td>
+          <td class="num">{{ number(q3.loc[col, team]) }}</td>
+          <td class="num"><strong>{{ number(iqr.loc[col, team]) }}</strong></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Quartis por interpolação linear; valores por jogo, 2 casas decimais.</p>
+
+  <h3>Quadro-resumo: IQR por variável e por time</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th>
+          {% for team in selected %}
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+          <th class="num">Liga (todos os jogos)</th>
+          {% if selected | length > 1 %}<th>Mais concentrado</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, row in iqr.iterrows() %}
+        {% set best = row.idxmin() %}
+        {% set tie = row.min() == row.max() %}
+        <tr>
+          <td>{{ variable_names[col] }}</td>
+          {% for team in selected %}
+          <td class="num">
+            {% if selected | length > 1 and team == best and not tie %}<strong>{{ number(row[team]) }}</strong>{% else %}{{ number(row[team]) }}{% endif %}
+            <span class="cell-note">CV {{ number(cv.loc[col, team]) }}% · G1 {{ number(skew.loc[col, team]) }}</span>
+          </td>
+          {% endfor %}
+          <td class="num">{{ number(league_iqr[col]) }}</td>
+          {% if selected | length > 1 %}
+          <td>{% if tie %}Empate{% else %}<span class="team-dot" style="background: {{ colors[best] }}"></span>{{ best }}{% endif %}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    IQR na unidade de cada variável (por jogo). Em negrito, o menor IQR entre os times escolhidos (o mais concentrado).
+    Abaixo de cada valor, o CV (página <a href="/cv">CV</a>) e a assimetria G1 (página <a href="/assimetria">Assimetria</a>)
+    do mesmo time e variável.
+  </p>
+
+  <div class="chart">{{ ranges | safe }}</div>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>IQR × amplitude × desvio padrão</h2>
+  <p>
+    Numa distribuição normal com cerca de 75 jogos, a amplitude fica perto de <strong>{{ number(normal_range) }} IQRs</strong>
+    e o desvio padrão, perto de <strong>{{ number(normal_std) }} IQR</strong> (IQR ÷ 1,349). Razões acima dessas
+    referências (em negrito) indicam amplitude ou desvio puxados por jogos extremos.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Variável</th>
+          {% for team in selected %}
+          <th colspan="5" class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for team in selected %}
+          <th class="num">IQR</th><th class="num">Amplitude</th><th class="num">Amplitude ÷ IQR</th>
+          <th class="num">Desvio</th><th class="num">Desvio ÷ IQR</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          {% for team in selected %}
+          {% set spread = iqr.loc[col, team] %}
+          {% set range_ratio = amplitude.loc[col, team] / spread %}
+          {% set std_ratio = std.loc[col, team] / spread %}
+          <td class="num">{{ number(spread) }}</td>
+          <td class="num">{{ number(amplitude.loc[col, team]) }}</td>
+          <td class="num">{% if range_ratio > normal_range %}<strong>{{ number(range_ratio) }}</strong>{% else %}{{ number(range_ratio) }}{% endif %}</td>
+          <td class="num">{{ number(std.loc[col, team]) }}</td>
+          <td class="num">{% if std_ratio > normal_std %}<strong>{{ number(std_ratio) }}</strong>{% else %}{{ number(std_ratio) }}{% endif %}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h3>{{ variable_names[variable] }}: o que acontece ao tirar os outliers</h3>
+  <p>
+    A prova direta da robustez: recalculamos as três medidas sem os jogos que o boxplot marca como outliers
+    (fora de Q1 − 1,5 × IQR e Q3 + 1,5 × IQR).
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Medida</th>
+          {% for team in selected %}
+          <th colspan="3" class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for team in selected %}<th class="num">Com outliers</th><th class="num">Sem outliers</th><th class="num">Variação</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for measure, label in [("desvio_padrao", "Desvio padrão"), ("iqr", "IQR"), ("amplitude", "Amplitude")] %}
+        <tr>
+          <td>{{ label }}</td>
+          {% for team in selected %}
+          {% set before = robust[team].loc[measure, "com_outliers"] %}
+          {% set after = robust[team].loc[measure, "sem_outliers"] %}
+          <td class="num">{{ number(before) }}</td>
+          <td class="num">{{ number(after) }}</td>
+          <td class="num">{{ number((after - before) / before * 100) }}%</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Se o time não tem outliers na variável, as duas colunas são iguais (variação 0%).</p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>A regra de outliers: 1,5 × IQR</h2>
+  <p>
+    Adotamos <strong>k = 1,5</strong>, a regra de Tukey para valores “fora do comum”, nos limites
+    <strong>Q1 − 1,5 × IQR</strong> e <strong>Q3 + 1,5 × IQR</strong>. Numa distribuição normal, ela marca só cerca de
+    0,7% dos dados: quem passa desses limites é de fato raro. O k = {{ extreme }} (“extremos”) é muito mais permissivo. A
+    tabela recalcula os limites de {{ variable_names[variable] }} e compara três versões da regra; os números da primeira
+    linha são exatamente os do boxplot abaixo.
+  </p>
+  {% for team in selected %}
+  <h4><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</h4>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Regra</th><th class="num">Q1</th><th class="num">Q3</th><th class="num">IQR</th>
+          <th class="num">Limite inferior</th><th class="num">Limite superior</th>
+          <th class="num">Outliers abaixo</th><th class="num">Outliers acima</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule, row in rules[team].iterrows() %}
+        <tr>
+          <td>{{ rule }}</td>
+          <td class="num">{{ number(row.q1) }}</td>
+          <td class="num">{{ number(row.q3) }}</td>
+          <td class="num">{{ number(row.iqr) }}</td>
+          <td class="num">{{ number(row.limite_inferior) }}</td>
+          <td class="num">{{ number(row.limite_superior) }}</td>
+          <td class="num">{{ row.abaixo | int }}</td>
+          <td class="num">{{ row.acima | int }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% set adopted = rules[team].iloc[0] %}
+  {% set hinges = rules[team].iloc[2] %}
+  {% if adopted.abaixo != hinges.abaixo or adopted.acima != hinges.acima %}
+  <p class="notice">
+    <strong>Divergência:</strong> as dobradiças de Tukey dão Q1 = {{ number(hinges.q1) }} e Q3 = {{ number(hinges.q3) }}
+    (contra {{ number(adopted.q1) }} e {{ number(adopted.q3) }} na interpolação linear) e, com isso, um número diferente
+    de outliers. Em contagens inteiras, uma pequena diferença no quartil desloca o limite o bastante para um jogo entrar
+    ou sair. Por isso o projeto usa o mesmo método em todas as páginas.
+  </p>
+  {% endif %}
+  {% endfor %}
+
+  <h3>Boxplot — conferência</h3>
+  <p>
+    Os limites tracejado e pontilhado do boxplot são os da linha “Interpolação linear, k = 1,5”, e os triângulos são
+    os outliers contados nela.
+  </p>
+  <div class="chart">{{ box | safe }}</div>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>O que os resultados mostram</h2>
+  <ul>
+    <li>
+      <strong>Na prática.</strong> Metade dos jogos do Cleveland Cavaliers terminou entre 111,25 e 129 pontos (faixa de
+      17,75); a do New York Knicks, entre 107 e 128 (faixa de 21). Nos rebotes, a ordem se inverte: o NYK ficou entre 43 e
+      50 (faixa de 7) e o CLE, entre 39 e 48 (faixa de 9).
+    </li>
+    <li>
+      <strong>Qual time é mais concentrado?</strong> O <strong>CLE tem a faixa central mais estreita em 6 das 7
+      variáveis</strong> (pontos, assistências, roubos de bola, tocos, faltas e cestas de 3); o NYK só em rebotes. O
+      padrão é bem mais claro que o do CV, em que o NYK aparecia como mais regular também em roubos de bola e faltas. A
+      diferença vem dos extremos: o CV usa o desvio, que é puxado por eles, e o IQR não. É o mesmo resultado do CV
+      robusto (IQR ÷ mediana) na página <a href="/cv">CV</a>.
+    </li>
+    <li>
+      <strong>Onde a amplitude é muito maior que o IQR.</strong> Os casos acima da referência normal (~3,57 IQRs) mais
+      fortes são os rebotes do NYK (amplitude 37 = 5,29 IQRs), os roubos de bola do CLE (14 = 4,67 IQRs) e os tocos do CLE
+      (11 = 4,00 IQRs), justamente as variáveis com mais outliers no boxplot (4, 3 e 1). A amplitude depende só de dois
+      jogos, o mínimo e o máximo, e por isso um único jogo extremo a estica; o IQR ignora os 25% de cada ponta.
+    </li>
+    <li>
+      <strong>Onde o desvio é inflado e o IQR fica estável.</strong> As maiores razões desvio ÷ IQR são as mesmas três:
+      roubos de bola do CLE (0,96), rebotes do NYK (0,94) e tocos do CLE (0,90), contra 0,74 numa distribuição normal.
+      Tirando os 4 outliers dos rebotes do NYK, a amplitude cai 35% (37 → 24) e o desvio cai 20% (6,59 → 5,27), enquanto
+      o IQR vai de 7 para 6. Nos roubos de bola do CLE, o IQR até sobe um pouco sem os outliers (3 → 3,5), porque em
+      contagens inteiras os quartis andam aos saltos de meio ponto, mas a mudança continua pequena perto da amplitude
+      (14 → 11).
+    </li>
+    <li>
+      <strong>A regra de 1,5 × IQR.</strong> Recalculando os limites, os outliers da regra são exatamente os do
+      boxplot, porque o gráfico usa os mesmos quartis. Com k = 3, <strong>nenhum</strong> jogo do CLE ou do NYK seria
+      marcado em nenhuma das 7 variáveis: os casos encontrados são incomuns, mas nenhum é extremo. A única divergência
+      entre métodos de quartil aparece nos tocos do CLE: pela interpolação linear, Q3 = 6,75 e o limite superior é 10,88,
+      então o jogo de 11 tocos (contra o POR, em 03/12/2025) é outlier; pelas dobradiças de Tukey, Q3 = 7, o limite é 11,5
+      e o mesmo jogo não seria.
+    </li>
+    <li>
+      <strong>Articulando com a assimetria e o CV.</strong> As variáveis em que o IQR mais diverge do desvio e da
+      amplitude são as mesmas em que a assimetria aparecia (rebotes do NYK, G1 −0,77) e em que o CV clássico e o robusto
+      discordavam (roubos de bola). Nas variáveis aproximadamente simétricas e sem outliers, como pontos dos dois times,
+      desvio e IQR contam a mesma história (razão ~0,7, perto da normal). As três medidas se completam: a assimetria
+      mostra <em>para que lado</em> estão os extremos, o CV mede a dispersão <em>relativa à média</em>, e o IQR mede a
+      dispersão <em>sem os extremos</em>.
+    </li>
+  </ul>
+</section>
+{% endblock %}

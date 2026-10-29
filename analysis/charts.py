@@ -387,3 +387,43 @@ def cv_bars(df, teams, columns):
         legend=dict(orientation="h", y=-0.16),
     )
     return fig
+
+
+def iqr_ranges(df, teams, columns):
+    palette = team_palette(teams)
+    fig = make_subplots(rows=2, cols=4, subplot_titles=[VARIABLE_NAMES[col] for col in columns],
+                        vertical_spacing=0.2, horizontal_spacing=0.06)
+    for i, col in enumerate(columns):
+        row, cell = i // 4 + 1, i % 4 + 1
+        for team in teams:
+            s = df[df["time"] == team][col]
+            q1, q3 = s.quantile([0.25, 0.75])
+            fig.add_trace(go.Scatter(
+                x=[s.min(), s.max()], y=[team, team], mode="lines+markers", name="Amplitude (mínimo a máximo)",
+                legendgroup="amplitude", showlegend=i == 0 and team == teams[0],
+                line=dict(color=INK, width=1.5), marker=dict(symbol="line-ns", size=10, line=dict(color=INK, width=1.5)),
+                hovertext=f"{team}<br>Mínimo {number(s.min())} · máximo {number(s.max())}<br>"
+                          f"Amplitude {number(s.max() - s.min())}",
+                hoverinfo="text",
+            ), row=row, col=cell)
+            fig.add_trace(go.Bar(
+                y=[team], x=[q3 - q1], base=[q1], orientation="h", name=team, legendgroup=team,
+                showlegend=i == 0, marker=team_marker(palette[team]), width=0.5,
+                hovertext=f"{team}<br>Q1 {number(q1)} · Q3 {number(q3)}<br>IQR {number(q3 - q1)}",
+                hoverinfo="text",
+            ), row=row, col=cell)
+            fig.add_trace(go.Scatter(
+                x=[s.median()], y=[team], mode="markers", name="Mediana", legendgroup="mediana",
+                showlegend=i == 0 and team == teams[0],
+                marker=dict(symbol="diamond", size=9, color="#ffffff", line=dict(color=INK, width=2)),
+                hovertext=f"{team}<br>Mediana {number(s.median())}", hoverinfo="text",
+            ), row=row, col=cell)
+        fig.update_yaxes(showticklabels=False, autorange="reversed", row=row, col=cell)
+        fig.update_xaxes(title_text="por jogo", title_font=dict(size=11), row=row, col=cell)
+
+    fig.update_layout(
+        title="Faixa central (IQR, de Q1 a Q3) dentro da amplitude (mínimo a máximo)",
+        template="plotly_white", height=560, separators=",.", barmode="overlay",
+        legend=dict(orientation="h", y=-0.14),
+    )
+    return fig
