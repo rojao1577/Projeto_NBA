@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Coeficiente de variação{% endblock %}
+
+{% block content %}
+<h1>Coeficiente de variação</h1>
+<p class="lead">
+  O coeficiente de variação (CV) mede a dispersão <em>em relação à média</em>: quanto, em proporção, os jogos de um time
+  costumam se afastar do seu valor típico. Por não ter unidade, ele permite comparar variáveis de escalas muito
+  diferentes, como pontos e tocos, e dizer qual time é mais regular.
+</p>
+
+<section class="card">
+  <form class="filters" method="get" action="/cv">
+    <label>Time A
+      <select name="time_a">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_a %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Time B
+      <select name="time_b">
+        {% for team in teams %}
+        <option value="{{ team }}" {% if team == team_b %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Ver</button>
+  </form>
+</section>
+
+<section class="card">
+  <span class="card-label">Método</span>
+  <h2>Fórmula e condição de validade</h2>
+  <p>
+    <strong>CV = (desvio padrão ÷ média) × 100</strong>, com o desvio padrão <strong>amostral (n − 1)</strong>, a mesma
+    convenção da página <a href="/descritiva">Descritiva</a>, e o resultado em <strong>percentual</strong>, com 2 casas
+    decimais. Exemplo: os pontos do Cleveland Cavaliers têm desvio de 12,54 e média de 119,39, então
+    CV = 12,54 ÷ 119,39 × 100 = 10,50%: num jogo típico, a pontuação se afasta cerca de 10% da média.
+  </p>
+  <p>
+    <strong>Quando o CV é válido.</strong> (1) A variável precisa ser de <strong>razão</strong>, com um zero
+    verdadeiro: as 7 são contagens (0 tocos é ausência de tocos, e 10 tocos é o dobro de 5), então todas atendem.
+    (2) A média precisa ser <strong>positiva e longe de zero</strong>, porque ela está no denominador: quando a média é
+    pequena, qualquer diferença de 1 ou 2 unidades vira uma porcentagem grande. Adotamos média abaixo de
+    {{ small_mean }} por jogo como sinal de cautela.
+  </p>
+  <p>
+    <strong>Por que a média pequena infla o CV.</strong> Em contagens de eventos independentes (o modelo de Poisson),
+    a variância fica próxima da média. Então o desvio é cerca de √média e o CV, cerca de <strong>1 ÷ √média</strong>:
+    só pelo tamanho da média, uma variável com 4 eventos por jogo já teria CV de ~50%, e uma com 100, de ~10%. Esse
+    “CV esperado” serve de régua: CV perto dele quer dizer variação típica do acaso; bem acima, irregularidade de fato.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th>
+          <th class="num">Média da liga</th>
+          {% for team in selected %}
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>Média {{ team }}</th>
+          {% endfor %}
+          <th class="num">CV esperado (liga)</th><th>Situação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        {% set small = league_mean[col] < small_mean %}
+        <tr>
+          <td>{{ name }}</td>
+          <td class="num">{{ number(league_mean[col]) }}</td>
+          {% for team in selected %}<td class="num">{{ number(means.loc[col, team]) }}</td>{% endfor %}
+          <td class="num">{{ number(league_poisson[col]) }}%</td>
+          <td>{% if small %}<strong>Válido, com cautela</strong> (média &lt; {{ small_mean }}){% else %}Válido{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    As 7 variáveis são contagens, logo de razão. CV esperado = 1 ÷ √(média da liga) × 100. Pontos não são uma contagem de eventos de 1 unidade (as cestas valem 1, 2 ou 3), então ali o CV real tende a ficar
+    acima do esperado.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Quadro-resumo: CV (%) por variável e por time</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th>
+          {% for team in selected %}
+          <th class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+          <th class="num">Liga (todos os jogos)</th>
+          {% if selected | length > 1 %}<th>Mais regular</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, row in cv.iterrows() %}
+        {% set best = row.idxmin() %}
+        <tr>
+          <td>{{ variable_names[col] }}</td>
+          {% for team in selected %}
+          <td class="num">
+            {% if selected | length > 1 and team == best %}<strong>{{ number(row[team]) }}</strong>{% else %}{{ number(row[team]) }}{% endif %}
+            <span class="cell-note">{{ ranks.loc[col, team] }}º mais regular de 30</span>
+          </td>
+          {% endfor %}
+          <td class="num">{{ number(league_cv[col]) }}</td>
+          {% if selected | length > 1 %}
+          <td><span class="team-dot" style="background: {{ colors[best] }}"></span>{{ best }}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    CV em %, desvio amostral (n − 1), 2 casas decimais. Em negrito, o menor CV entre os times escolhidos (o mais
+    regular). A posição compara o CV do time com o dos 30 times (1º = menor CV da liga).
+  </p>
+
+  <h3>Por que comparar pelo CV e não pelo desvio padrão</h3>
+  <p>
+    No painel da esquerda, pontos tem de longe o maior desvio, e tocos o menor: parece que a pontuação é a estatística
+    mais instável. Mas o desvio carrega a unidade e o tamanho de cada variável (pontos estão na casa dos 115; tocos, na
+    dos 5). No painel da direita, o CV divide pela média e a ordem se inverte: pontos é a variável <em>mais estável</em>
+    e tocos, a mais dispersa. Os traços pretos marcam o CV esperado só pelo tamanho da média (1 ÷ √média).
+  </p>
+  <div class="chart">{{ chart | safe }}</div>
+
+  <h3>Confronto: desvio padrão, CV, alternativa robusta e assimetria</h3>
+  <p>
+    A alternativa robusta usa as medidas que ignoram os extremos: <strong>CV robusto = IQR ÷ mediana × 100</strong>
+    (quartis por interpolação linear, os mesmos do boxplot). A assimetria (G1) é a da página
+    <a href="/assimetria">Assimetria</a>.
+  </p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th rowspan="2">Variável</th>
+          {% for team in selected %}
+          <th colspan="4" class="num"><span class="team-dot" style="background: {{ colors[team] }}"></span>{{ team }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for team in selected %}
+          <th class="num">Desvio</th><th class="num">CV (%)</th><th class="num">CV robusto (%)</th><th class="num">G1</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          {% for team in selected %}
+          <td class="num">{{ number(std.loc[col, team]) }}</td>
+          <td class="num">{{ number(cv.loc[col, team]) }}</td>
+          <td class="num">{{ number(robust.loc[col, team]) }}</td>
+          <td class="num">{{ number(skew.loc[col, team]) }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card interpretation">
+  <span class="card-label">(b) Interpretação</span>
+  <h2>O que os resultados mostram</h2>
+  <ul>
+    <li>
+      <strong>Variáveis mais estáveis e mais dispersas.</strong> Para CLE e NYK, a ordem é praticamente a mesma da liga:
+      pontos é a mais estável (CV de 10,50% no CLE e 12,12% no NYK), seguida de rebotes (~15%), assistências e faltas
+      (~18% a 21%) e cestas de 3 (23% a 28%). Roubos de bola (~31% a 34%) e tocos (~49% a 50%) são as mais dispersas.
+      Comparar pelo desvio bruto daria a ordem quase inversa: o desvio de pontos do CLE (12,54) é 5 vezes o de tocos
+      (2,47), mas em relação à média os tocos variam 5 vezes mais.
+    </li>
+    <li>
+      <strong>O CV alto de tocos e roubos de bola é, em boa parte, efeito do tamanho da média.</strong> Com médias de
+      4,85 e 8,41 por jogo na liga, essas duas são as únicas abaixo do limite de cautela. O CV real fica muito perto do
+      esperado numa contagem de Poisson: nos tocos do NYK, 49,91% contra 50,06% esperados; nos do CLE, 49,06% contra
+      44,6%. Então um CV de 50% em tocos <em>não</em> quer dizer que o time é “irregular” em tocos: é a variação
+      natural de um evento raro. Nas variáveis de contagem, a razão entre o CV real e o esperado fica entre 0,86 e 1,10
+      para os dois times.
+    </li>
+    <li>
+      <strong>Qual time é mais regular?</strong> O padrão muda de variável para variável. O <strong>Cleveland
+      Cavaliers</strong> é mais regular em 4 (pontos, assistências, tocos e cestas de 3), e o <strong>New York
+      Knicks</strong> em 3 (rebotes, roubos de bola e faltas). Os destaques contra a liga: o CLE é o
+      <strong>3º mais regular dos 30 em cestas de 3</strong> (22,67%), um ataque de perímetro previsível de um jogo para
+      outro; o NYK é o 3º mais regular em roubos de bola (31,40%), mas o <strong>28º em pontos</strong> (12,12%), um dos
+      ataques mais irregulares da NBA. Na prática, o CLE costuma marcar 119 pontos com desvio de ~12,5; o NYK, 117 com
+      desvio de ~14.
+    </li>
+    <li>
+      <strong>CV × assimetria e a alternativa robusta.</strong> Nenhuma variável de CLE ou NYK tem assimetria forte
+      (a maior é a de rebotes do NYK, −0,77, moderada), então o CV clássico é adequado. Nos rebotes do NYK, os jogos de
+      24, 29 e 30 rebotes inflam o desvio: o CV robusto, que os ignora, mostra o NYK ainda mais concentrado que o CLE
+      (15,22% contra 20,45%), e os dois CVs concordam que o NYK é o mais regular.
+    </li>
+    <li>
+      <strong>Onde as duas medidas discordam.</strong> Em roubos de bola e faltas, o CV clássico aponta o NYK como mais
+      regular, e o robusto aponta o CLE. A causa é a natureza discreta dos dados: com contagens pequenas, os quartis
+      andam de meio em meio ponto, e meio ponto muda muito a razão. Em roubos de bola, o CLE tem Q1 = 7, Q3 = 10 e
+      mediana 9 (33,33%); o NYK tem Q1 = 6,5, Q3 = 10 e mediana 8 (43,75%). Pelo mesmo motivo, os tocos do NYK chegam a
+      75% no CV robusto (IQR 3 ÷ mediana 4). Conclusão: em contagens pequenas, o CV robusto é instável, e diferenças de
+      poucos pontos percentuais entre os times devem ser lidas como empate técnico. Ele serve como conferência, e não
+      como substituto.
+    </li>
+  </ul>
+</section>
+{% endblock %}

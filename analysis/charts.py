@@ -4,6 +4,7 @@ from plotly.subplots import make_subplots
 from scipy.stats import gaussian_kde
 from analysis.descriptive import describe, league_zscores
 from analysis.formatting import number
+from analysis.shape import by_team, cv_table, poisson_cv_table
 
 VARIABLE_NAMES = {
     "pontos": "Pontos",
@@ -269,5 +270,50 @@ def histogram_kde(df, teams, col):
         title=f"Histograma e curva de densidade — {name} por jogo",
         template="plotly_white", height=480, separators=",.", bargap=0.05,
         legend=dict(orientation="h", y=-0.22),
+    )
+    return fig
+
+
+def cv_bars(df, teams, columns):
+    names = [VARIABLE_NAMES[col] for col in columns]
+    std = by_team(df, teams, columns, "std")
+    cv = cv_table(df, teams, columns)
+    expected = poisson_cv_table(df, teams, columns)
+    fig = make_subplots(rows=1, cols=2, shared_yaxes=True, horizontal_spacing=0.06,
+                        subplot_titles=["Desvio padrão (na unidade de cada variável)",
+                                        "Coeficiente de variação (%)"])
+    for position, team in enumerate(teams):
+        color = team_color(team, position)
+        fig.add_trace(go.Bar(
+            y=names, x=std[team], orientation="h", name=team, legendgroup=team, offsetgroup=str(position),
+            marker=dict(color=color, cornerradius=4),
+            hovertext=[f"{team}<br>{n}: desvio {number(v)}" for n, v in zip(names, std[team])],
+            hoverinfo="text",
+        ), row=1, col=1)
+        fig.add_trace(go.Bar(
+            y=names, x=cv[team], orientation="h", name=team, legendgroup=team, showlegend=False,
+            offsetgroup=str(position), marker=dict(color=color, cornerradius=4),
+            hovertext=[f"{team}<br>{n}: CV {number(v)}%<br>Esperado numa contagem de Poisson: {number(e)}%"
+                       for n, v, e in zip(names, cv[team], expected[team])],
+            hoverinfo="text",
+        ), row=1, col=2)
+
+    for position, team in enumerate(teams):
+        fig.add_trace(go.Scatter(
+            y=names, x=expected[team], mode="markers", orientation="h", name="CV esperado só pelo tamanho da média (1 ÷ √média)",
+            legendgroup="poisson", showlegend=position == 0, offsetgroup=str(position),
+            marker=dict(symbol="line-ns", size=14, line=dict(color=INK, width=3)),
+            hovertext=[f"{team}<br>{n}: CV esperado {number(e)}%" for n, e in zip(names, expected[team])],
+            hoverinfo="text",
+        ), row=1, col=2)
+
+    fig.update_xaxes(title_text="Desvio padrão amostral (n − 1)", rangemode="tozero", row=1, col=1)
+    fig.update_xaxes(title_text="CV = desvio ÷ média × 100 (%)", rangemode="tozero",
+                     range=[0, float(cv.max().max()) * 1.1], row=1, col=2)
+    fig.update_layout(
+        title="Dispersão bruta × dispersão relativa",
+        yaxis=dict(autorange="reversed"), barmode="group", scattermode="group",
+        template="plotly_white", height=560, separators=",.",
+        legend=dict(orientation="h", y=-0.16),
     )
     return fig

@@ -1,8 +1,8 @@
 import pandas as pd
 from flask import Flask, abort, render_template, request
 
-from analysis.charts import (VARIABLE_NAMES, boxplot, histogram_kde, mean_bars, method_heatmap, method_strip,
-                             team_color, votes_bars, zscore_bars)
+from analysis.charts import (VARIABLE_NAMES, boxplot, cv_bars, histogram_kde, mean_bars, method_heatmap,
+                             method_strip, team_color, votes_bars, zscore_bars)
 from analysis.cleaning import clean, convert_dates, derive_matchups, rename_columns
 from analysis.descriptive import compare_teams, outlier_games, team_table
 from analysis.formatting import format_measures, number
@@ -10,13 +10,13 @@ from analysis import outliers as od
 from analysis.loader import load_raw
 from analysis.quality import (DOMAIN, ZERO_MEANING, duplicates, inconsistencies_by_column, inconsistency_checks,
                               missing_counts, out_of_domain, special_values, validate_percentages)
-from analysis.shape import MODERATE, STRONG, direction, intensity, skew_table
+from analysis.shape import (MODERATE, SMALL_MEAN, STRONG, by_team, cv, cv_table, direction, intensity, poisson_cv,
+                            robust_cv_table, skew_table)
 from config import GROUP_TEAMS, VARIABLES
 
 PENDING_SECTIONS = {
     "dados": "Dados",
     "tratamento": "Tratamento",
-    "cv": "Coeficiente de variação",
     "iqr": "Intervalo interquartil",
     "sintese": "Síntese",
 }
@@ -74,6 +74,7 @@ def create_app() -> Flask:
     column_flags = od.all_column_flags(df, VARIABLES)
     joint = od.joint_flags(df, VARIABLES)
     inconsistent = inconsistencies_by_column(inconsistency_checks(df)).reindex(VARIABLES, fill_value=0)
+    cv_ranks = cv_table(df, teams, VARIABLES).rank(axis=1).astype(int)
 
     @app.route("/")
     def index():
@@ -170,6 +171,27 @@ def create_app() -> Flask:
             measures=compare_teams(df, selected, variable), hist=hist, box=box,
             direction=direction, intensity=intensity, number=number,
             moderate=MODERATE, strong=STRONG,
+        )
+
+    @app.route("/cv")
+    def coeficiente_variacao():
+        team_a = choose(request.args.get("time_a"), teams, GROUP_TEAMS[0])
+        team_b = choose(request.args.get("time_b"), teams, GROUP_TEAMS[1])
+        selected = [team_a] if team_a == team_b else [team_a, team_b]
+
+        chart = cv_bars(df, selected, VARIABLES).to_html(full_html=False, include_plotlyjs="cdn")
+        colors = {team: team_color(team, position) for position, team in enumerate(selected)}
+
+        return render_template(
+            "cv.html",
+            teams=teams, team_a=team_a, team_b=team_b, selected=selected,
+            variable_names=VARIABLE_NAMES, colors=colors, chart=chart,
+            cv=cv_table(df, selected, VARIABLES), ranks=cv_ranks[selected],
+            robust=robust_cv_table(df, selected, VARIABLES), skew=skew_table(df, selected, VARIABLES),
+            std=by_team(df, selected, VARIABLES, "std"), means=by_team(df, selected, VARIABLES, "mean"),
+            league_cv=df[VARIABLES].agg(cv), league_mean=df[VARIABLES].mean(),
+            league_poisson=df[VARIABLES].agg(poisson_cv),
+            small_mean=SMALL_MEAN, number=number,
         )
 
     @app.route("/<section>")
