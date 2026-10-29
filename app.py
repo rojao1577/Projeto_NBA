@@ -6,7 +6,7 @@ from analysis.charts import (VARIABLE_NAMES, boxplot, cv_bars, date_bars, histog
 from analysis.cleaning import (DERIVED_COLUMNS, ML_EXCLUDED, clean, convert_dates, derive_matchups, games_by_month,
                                games_by_weekday, ml_features, rename_columns)
 from analysis.descriptive import compare_teams, league_zscores, outlier_games, team_record, team_table
-from analysis.dictionary import COLUMNS, data_dictionary, games_per_team
+from analysis.dictionary import COLUMNS, data_dictionary, games_per_team, team_info
 from analysis.formatting import format_measures, number
 from analysis import outliers as od
 from analysis.loader import load_raw
@@ -48,6 +48,7 @@ def outliers_elsewhere(df, team: str, variable: str) -> list[str]:
 
 
 LEAGUE = "liga"
+LOWER_IS_BETTER = {"faltas"}
 OUTLIER_PARAMS = {
     "z": od.Z_THRESHOLD, "iqr_k": od.IQR_K, "grubbs_alpha": od.GRUBBS_ALPHA,
     "contamination": od.CONTAMINATION, "knn_k": od.KNN_NEIGHBORS, "lof_k": od.LOF_NEIGHBORS,
@@ -62,6 +63,15 @@ def flagged_games(df, joint, rows, min_votes: int) -> list[dict]:
     games["votos"] = joint.loc[selected, "votos"]
     games["metodos"] = [", ".join(methods.columns[row]) for row in methods.to_numpy()]
     return games.sort_values(["votos", "data_jogo"], ascending=[False, True]).to_dict("records")
+
+
+def rank_record(record) -> pd.DataFrame:
+    return pd.DataFrame({
+        "aproveitamento": record["aproveitamento"].rank(ascending=False, method="min"),
+        "pontos": record["pontos"].rank(ascending=False, method="min"),
+        "sofridos": record["sofridos"].rank(ascending=True, method="min"),
+        "saldo": record["saldo"].rank(ascending=False, method="min"),
+    }).astype(int)
 
 
 def cumulative_matches(df) -> float:
@@ -82,10 +92,44 @@ def create_app() -> Flask:
     joint = od.joint_flags(df, VARIABLES)
     inconsistent = inconsistencies_by_column(inconsistency_checks(df)).reindex(VARIABLES, fill_value=0)
     cv_ranks = cv_table(df, teams, VARIABLES).rank(axis=1).astype(int)
+    info = team_info(df)
+    record = team_record(df)
+    record_ranks = rank_record(record)
+    means = df.groupby("time")[VARIABLES].mean()
+    mean_ranks = means.rank(ascending=False, method="min").astype(int)
 
     @app.route("/")
     def index():
-        return render_template("em_construcao.html", title="Início")
+        return render_template(
+            "inicio.html",
+            info=info, main=GROUP_TEAMS, record=record, record_ranks=record_ranks,
+            main_logos={team: info.loc[info["time"] == team, "logo"].iloc[0] for team in GROUP_TEAMS},
+            main_siglas={team: info.index[info["time"] == team][0] for team in GROUP_TEAMS},
+            rows=len(df), games=df["id_jogo"].nunique(),
+            first=df["data_jogo"].min(), last=df["data_jogo"].max(), number=number,
+        )
+
+    @app.route("/time/<sigla>")
+    def team_page(sigla):
+        sigla = sigla.upper()
+        if sigla not in info.index:
+            abort(404)
+        team = info.loc[sigla, "time"]
+        partner = GROUP_TEAMS[1] if team == GROUP_TEAMS[0] else GROUP_TEAMS[0]
+        z = league_zscores(df, [team], VARIABLES).loc[team]
+        performance = z * pd.Series({col: -1 if col in LOWER_IS_BETTER else 1 for col in VARIABLES})
+        chart = zscore_bars(df, [team], VARIABLES).to_html(full_html=False, include_plotlyjs="cdn")
+        return render_template(
+            "time.html",
+            team=team, sigla=sigla, logo=info.loc[sigla, "logo"], main=GROUP_TEAMS, partner=partner,
+            record=record.loc[team], ranks=record_ranks.loc[team], teams_count=len(info),
+            variable_names=VARIABLE_NAMES, means=means.loc[team], league_means=means.mean(),
+            mean_ranks=mean_ranks.loc[team], z=z, best=performance.idxmax(), worst=performance.idxmin(),
+            all_above=bool((performance >= 0).all()),
+            cv=cv_table(df, [team], VARIABLES)[team], iqr=iqr_table(df, [team], VARIABLES)[team],
+            skew=skew_table(df, [team], VARIABLES)[team], outliers=team_table(df, team, VARIABLES)["outliers"],
+            chart=chart, number=number,
+        )
 
     @app.route("/descritiva")
     def descritiva():
@@ -259,22 +303,13 @@ def create_app() -> Flask:
 
     @app.route("/sintese")
     def sintese():
-        record = team_record(df)
-        record_ranks = pd.DataFrame({
-            "aproveitamento": record["aproveitamento"].rank(ascending=False, method="min"),
-            "pontos": record["pontos"].rank(ascending=False, method="min"),
-            "sofridos": record["sofridos"].rank(ascending=True, method="min"),
-            "saldo": record["saldo"].rank(ascending=False, method="min"),
-        }).astype(int)
-        means = df.groupby("time")[VARIABLES].mean()
         return render_template(
             "sintese.html",
             main=GROUP_TEAMS, variable_names=VARIABLE_NAMES,
             colors={team: team_dot(c) for team, c in team_palette(GROUP_TEAMS).items()},
             record=record.loc[GROUP_TEAMS], record_ranks=record_ranks.loc[GROUP_TEAMS],
             league_home=df.loc[df["casa"] == 1, "vitoria"].mean(),
-            means=means.loc[GROUP_TEAMS].T, league_means=means.mean(),
-            mean_ranks=means.rank(ascending=False, method="min").astype(int).loc[GROUP_TEAMS].T,
+            means=means.loc[GROUP_TEAMS].T, league_means=means.mean(), mean_ranks=mean_ranks.loc[GROUP_TEAMS].T,
             z=league_zscores(df, GROUP_TEAMS, VARIABLES).T,
             cv=cv_table(df, GROUP_TEAMS, VARIABLES), iqr=iqr_table(df, GROUP_TEAMS, VARIABLES),
             skew=skew_table(df, GROUP_TEAMS, VARIABLES),

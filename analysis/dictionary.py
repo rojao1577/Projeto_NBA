@@ -1,5 +1,7 @@
 import pandas as pd
 
+LOGO_URL = "https://cdn.nba.com/logos/nba/{}/global/D/logo.svg"
+
 
 COLUMNS = [
     
@@ -50,3 +52,10 @@ def data_dictionary(df: pd.DataFrame) -> pd.DataFrame:
 
 def games_per_team(df: pd.DataFrame) -> pd.Series:
     return df["time"].value_counts().sort_index()
+
+
+def team_info(df: pd.DataFrame) -> pd.DataFrame:
+    teams = df.drop_duplicates("time").copy()
+    teams["sigla"] = teams["confronto"].str[:3]
+    teams["logo"] = teams["id_time"].map(LOGO_URL.format)
+    return teams.set_index("sigla")[["time", "id_time", "logo"]].sort_values("time")

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Início{% endblock %}
+
+{% block content %}
+<h1>NBA 2025-26: Cleveland Cavaliers e New York Knicks</h1>
+<p class="lead">
+  Este site analisa a temporada regular 2025-26 da NBA a partir de uma base com as estatísticas de cada time em cada
+  jogo. Ele mostra como os dados foram verificados e tratados, descreve o desempenho dos times com tabelas e gráficos
+  interativos e interpreta o que os números dizem. O foco são o Cleveland Cavaliers e o New York Knicks; os outros 28
+  times servem de comparação.
+</p>
+
+<div class="featured">
+  {% for team in main %}
+  <a class="card featured-team" href="/time/{{ main_siglas[team] }}">
+    <span class="logo-bubble"><img src="{{ main_logos[team] }}" alt="{{ main_siglas[team] }}" width="88" height="88"></span>
+    <span>
+      <strong class="featured-name">{{ team }}</strong>
+      <span class="featured-line">
+        {{ record.loc[team, "vitorias"] }} vitórias – {{ record.loc[team, "derrotas"] }} derrotas
+        ({{ number(record.loc[team, "aproveitamento"] * 100) }}%, {{ record_ranks.loc[team, "aproveitamento"] }}º da liga)
+      </span>
+      <span class="featured-line">
+        {{ number(record.loc[team, "pontos"]) }} pontos marcados ({{ record_ranks.loc[team, "pontos"] }}º) ·
+        {{ number(record.loc[team, "sofridos"]) }} sofridos ({{ record_ranks.loc[team, "sofridos"] }}º menor)
+      </span>
+    </span>
+  </a>
+  {% endfor %}
+</div>
+
+<section class="card">
+  <h2>A base</h2>
+  <div class="stats">
+    <div class="stat"><span class="stat-value">{{ rows }}</span><span class="stat-label">linhas (um time em um jogo)</span></div>
+    <div class="stat"><span class="stat-value">{{ games }}</span><span class="stat-label">jogos</span></div>
+    <div class="stat"><span class="stat-value">{{ info | length }}</span><span class="stat-label">times</span></div>
+  </div>
+  <p>
+    Temporada regular de {{ first.strftime("%d/%m/%Y") }} a {{ last.strftime("%d/%m/%Y") }}, com 74 a 76 jogos por time
+    (a temporada completa tem 82). As variáveis analisadas são pontos, rebotes, assistências, roubos de bola, tocos,
+    faltas e cestas de 3 convertidas.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Como navegar</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Seção</th><th>O que mostra</th><th>Item do enunciado</th></tr></thead>
+      <tbody>
+        <tr><td><a href="/dados">Dados</a></td><td>Tamanho da base, tipos das colunas e dicionário de dados</td><td>Linhas, colunas, dicionário e tipos</td></tr>
+        <tr><td><a href="/tratamento">Tratamento</a></td><td>Data, novos nomes, colunas categóricas e exclusões para modelos</td><td>Data, renomear, categóricas, exclusões</td></tr>
+        <tr><td><a href="/qualidade">Qualidade</a></td><td>Valores especiais, percentuais corrigidos, ausentes e inconsistências</td><td>Valores especiais, ausentes (MCAR/MAR/MNAR)</td></tr>
+        <tr><td><a href="/outliers">Outliers</a></td><td>Os 7 métodos de detecção, coluna a coluna e em conjunto</td><td>Inconsistências e outliers por coluna</td></tr>
+        <tr><td><a href="/descritiva">Descritiva</a></td><td>Medidas, boxplot e barras com z-score</td><td>Estatística descritiva</td></tr>
+        <tr><td><a href="/assimetria">Assimetria</a></td><td>Coeficiente, histograma com KDE e boxplot</td><td>Assimetria (skewness)</td></tr>
+        <tr><td><a href="/cv">CV</a></td><td>Dispersão relativa e quadro-resumo</td><td>Coeficiente de variação</td></tr>
+        <tr><td><a href="/iqr">IQR</a></td><td>Faixa central, robustez e regra de outliers</td><td>Intervalo interquartil</td></tr>
+        <tr><td><a href="/sintese">Síntese</a></td><td>Conclusões sobre o CLE e o NYK</td><td>Síntese e interpretação</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Nas páginas com seletores, escolha o time e/ou a variável e clique em “Ver” para atualizar tabelas e gráficos.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Os 30 times da base</h2>
+  <p>Clique num time para ver o resumo dele em relação à liga.</p>
+  <div class="team-grid">
+    {% for sigla, row in info.iterrows() %}
+    <a class="team-tile{% if row.time in main %} main{% endif %}" href="/time/{{ sigla }}">
+      <span class="logo-bubble"><img src="{{ row.logo }}" alt="{{ sigla }}" width="72" height="72"></span>
+      <span class="team-abbr">{{ sigla }}</span>
+      <span class="team-name">{{ row.time }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="table-note">
+    Logos: marcas registradas da NBA e dos times, carregados de cdn.nba.com e usados aqui apenas com fins educacionais.
+  </p>
+</section>
+{% endblock %}

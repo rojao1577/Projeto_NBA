@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}{{ team }}{% endblock %}
+
+{% block content %}
+<div class="team-head">
+  <span class="logo-bubble"><img src="{{ logo }}" alt="{{ sigla }}" width="96" height="96"></span>
+  <div>
+    <h1>{{ team }}</h1>
+    <p class="lead">
+      {% if team in main %}
+      Um dos dois times principais do projeto. As conclusões sobre ele estão na <a class="on-page" href="/sintese">Síntese</a>.
+      {% else %}
+      Um dos {{ teams_count - 2 }} times de comparação. Os números abaixo o situam em relação aos {{ teams_count }} times da base.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>Campanha</h2>
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-value">{{ record.vitorias | int }}–{{ record.derrotas | int }}</span>
+      <span class="stat-label">{{ number(record.aproveitamento * 100) }}% · {{ ranks.aproveitamento }}º da liga</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ number(record.pontos) }}</span>
+      <span class="stat-label">pontos marcados · {{ ranks.pontos }}º maior</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{{ number(record.sofridos) }}</span>
+      <span class="stat-label">pontos sofridos · {{ ranks.sofridos }}º menor</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">{% if record.saldo > 0 %}+{% endif %}{{ number(record.saldo) }}</span>
+      <span class="stat-label">saldo por jogo · {{ ranks.saldo }}º da liga</span>
+    </div>
+  </div>
+  <p>
+    Vence {{ number(record.casa * 100) }}% dos jogos em casa e {{ number(record.fora * 100) }}% fora, em
+    {{ record.jogos | int }} jogos na base.
+  </p>
+</section>
+
+<section class="card">
+  <span class="card-label">(a) Resultados</span>
+  <h2>As 7 variáveis em relação à liga</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Variável</th><th class="num">Média</th><th class="num">Posição</th><th class="num">Média da liga</th>
+          <th class="num">z</th><th class="num">CV (%)</th><th class="num">IQR</th><th class="num">G1</th><th class="num">Outliers</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col, name in variable_names.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          <td class="num">{{ number(means[col]) }}</td>
+          <td class="num">{{ mean_ranks[col] }}º</td>
+          <td class="num">{{ number(league_means[col]) }}</td>
+          <td class="num">{{ number(z[col]) }}</td>
+          <td class="num">{{ number(cv[col]) }}</td>
+          <td class="num">{{ number(iqr[col]) }}</td>
+          <td class="num">{{ number(skew[col]) }}</td>
+          <td class="num">{{ outliers[col] | int }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">
+    Posição: 1º = maior média da liga. Como ler cada coluna: z em <a href="/descritiva">Descritiva</a>, CV em
+    <a href="/cv">CV</a>, IQR em <a href="/iqr">IQR</a> e G1 em <a href="/assimetria">Assimetria</a>.
+  </p>
+  <p>
+    <strong>Melhor posição em relação à liga:</strong> {{ variable_names[best] | lower }}
+    (z = {{ number(z[best]) }}, {{ mean_ranks[best] }}º maior média).
+    {% if all_above %}
+    <strong>Em nenhuma variável o time fica pior que a liga</strong>; a menos destacada é
+    {{ variable_names[worst] | lower }} (z = {{ number(z[worst]) }}, {{ mean_ranks[worst] }}º).
+    {% else %}
+    <strong>Pior:</strong> {{ variable_names[worst] | lower }} (z = {{ number(z[worst]) }}, {{ mean_ranks[worst] }}º).
+    {% endif %}
+    Nessa comparação, o z das faltas conta ao contrário, porque cometer mais faltas é desvantagem.
+  </p>
+  <div class="chart">{{ chart | safe }}</div>
+  <p>
+    <a href="/descritiva?time_a={{ team | urlencode }}&time_b={{ partner | urlencode }}">Comparar com o {{ partner }}
+    na Descritiva →</a>
+  </p>
+</section>
+
+<p><a class="on-page" href="/">← Voltar aos 30 times</a></p>
+{% endblock %}
