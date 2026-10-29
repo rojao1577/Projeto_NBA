@@ -5,7 +5,7 @@ NBA. O foco são o **Cleveland Cavaliers** e o **New York Knicks**; os outros 28
 
 Projeto 1 · Laboratório de Ciência de Dados · UFAPE 2026.2 · Prof. Ryan Azevedo
 
-**Site publicado:** _link a preencher após a publicação no Render_
+**Site publicado:** <https://projeto-nba.onrender.com>
 
 ## Como rodar localmente
 
